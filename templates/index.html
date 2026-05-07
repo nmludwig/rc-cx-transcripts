@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RingCentral ACE — Transcript Downloader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Reset & base ───────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --orange:    #FF6A00;
+  --orange-lt: #FFF3E8;
+  --orange-dk: #CC5300;
+  --dark:      #111318;
+  --mid:       #3A3F4B;
+  --muted:     #8A909E;
+  --border:    #E2E5ED;
+  --bg:        #F7F8FA;
+  --white:     #FFFFFF;
+  --green:     #12B76A;
+  --red:       #F04438;
+  --blue:      #2E6BE6;
+  --radius:    10px;
+  --shadow:    0 2px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+}
+
+html, body {
+  height: 100%;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg);
+  color: var(--dark);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  background: var(--dark);
+  padding: 0 32px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.topbar-wordmark {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.01em;
+}
+
+.topbar-sep { color: #444; margin: 0 4px; }
+
+.topbar-product {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--orange);
+}
+
+.topbar-badge {
+  margin-left: auto;
+  background: var(--orange);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 20px 60px;
+}
+
+/* ── Card ───────────────────────────────────────────── */
+.card {
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 620px;
+  overflow: hidden;
+}
+
+.card-hero {
+  background: linear-gradient(135deg, var(--orange) 0%, #FF8C3A 100%);
+  padding: 28px 32px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-hero::after {
+  content: '';
+  position: absolute;
+  right: -30px; top: -30px;
+  width: 180px; height: 180px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+}
+
+.card-hero::before {
+  content: '';
+  position: absolute;
+  right: 40px; bottom: -50px;
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+}
+
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.7);
+  margin-bottom: 6px;
+}
+
+.hero-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.hero-sub {
+  font-size: 13px;
+  color: rgba(255,255,255,0.75);
+  margin-top: 6px;
+}
+
+.card-body {
+  padding: 28px 32px 32px;
+}
+
+/* ── Steps ──────────────────────────────────────────── */
+.step { display: none; }
+.step.active { display: block; }
+
+.step-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 4px;
+}
+
+.step-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--dark);
+  margin-bottom: 16px;
+}
+
+/* ── Step indicators ────────────────────────────────── */
+.steps-nav {
+  display: flex;
+  gap: 6px;
+  padding: 16px 32px 0;
+  background: var(--white);
+}
+
+.step-dot {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+
+.step-dot.done  { background: var(--orange); }
+.step-dot.active { background: var(--orange); opacity: 0.5; }
+
+/* ── Forms ──────────────────────────────────────────── */
+.form-group { margin-bottom: 18px; }
+
+label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mid);
+  margin-bottom: 6px;
+}
+
+label .req { color: var(--orange); margin-left: 2px; }
+
+input[type=text], input[type=password], input[type=date] {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--dark);
+  background: var(--white);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px rgba(255,106,0,0.1);
+}
+
+input.mono {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.input-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+.input-group {
+  position: relative;
+}
+
+.toggle-pw {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 4px;
+}
+
+.toggle-pw:hover { color: var(--orange); }
+
+/* ── Row of inputs ──────────────────────────────────── */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ── Date presets ───────────────────────────────────── */
+.date-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.preset-btn {
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mid);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-btn:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.preset-btn.active {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+/* ── Buttons ────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--orange);
+  color: #fff;
+  width: 100%;
+}
+
+.btn-primary:hover { background: var(--orange-dk); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-ghost {
+  background: var(--bg);
+  color: var(--mid);
+  border: 1.5px solid var(--border);
+}
+
+.btn-ghost:hover { border-color: var(--muted); color: var(--dark); }
+
+.btn-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.btn-row .btn-primary { flex: 1; }
+
+/* ── Info box ───────────────────────────────────────── */
+.info-box {
+  background: var(--orange-lt);
+  border: 1px solid rgba(255,106,0,0.2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--mid);
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.info-box strong { color: var(--dark); }
+
+.info-box a { color: var(--orange); text-decoration: none; }
+.info-box a:hover { text-decoration: underline; }
+
+/* ── Alert ──────────────────────────────────────────── */
+.alert {
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin-bottom: 16px;
+  display: none;
+}
+
+.alert.visible { display: flex; align-items: flex-start; gap: 8px; }
+
+.alert-error   { background: #FEF3F2; color: #B42318; border: 1px solid #FDA29B; }
+.alert-warn    { background: #FFFAEB; color: #B54708; border: 1px solid #FEC84B; }
+.alert-success { background: #F0FDF4; color: #166534; border: 1px solid #86EFAC; }
+
+/* ── Auth success card ──────────────────────────────── */
+.auth-success {
+  background: #F0FDF4;
+  border: 1.5px solid #86EFAC;
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.auth-success-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #166534;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.auth-success-detail {
+  font-size: 12px;
+  color: #15803D;
+  font-family: 'DM Mono', monospace;
+}
+
+/* ── Progress ───────────────────────────────────────── */
+.progress-wrap {
+  margin-bottom: 20px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--mid);
+  margin-bottom: 8px;
+}
+
+.progress-bar-bg {
+  height: 6px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--orange), #FF8C3A);
+  border-radius: 99px;
+  transition: width 0.5s ease;
+  width: 0%;
+}
+
+/* ── Log console ────────────────────────────────────── */
+.log-console {
+  background: #0F1117;
+  border-radius: var(--radius);
+  padding: 14px;
+  height: 220px;
+  overflow-y: auto;
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+.log-line { display: flex; gap: 10px; }
+.log-ts   { color: #4A5264; flex-shrink: 0; }
+.log-ok   { color: #12B76A; }
+.log-warn { color: #F79009; }
+.log-error{ color: #F04438; }
+.log-info { color: #98A0B3; }
+
+/* ── Summary cards ──────────────────────────────────── */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--dark);
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ── Download buttons ───────────────────────────────── */
+.download-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dl-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.dl-btn:hover {
+  border-color: var(--orange);
+  box-shadow: var(--shadow);
+}
+
+.dl-btn-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.dl-btn-icon.xlsx { background: #E8F5E9; }
+.dl-btn-icon.pdf  { background: #FEF3F2; }
+
+.dl-btn-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.dl-btn-text span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ── Spinner ────────────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: none;
+}
+
+.spinner.visible { display: inline-block; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Scope warning ──────────────────────────────────── */
+.scope-warn {
+  background: #FFFAEB;
+  border: 1px solid #FEC84B;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #92400E;
+  display: none;
+  margin-top: 14px;
+}
+
+.scope-warn.visible { display: block; }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <a class="topbar-logo" href="#">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <circle cx="14" cy="14" r="14" fill="#FF6A00"/>
+        <path d="M8 14a6 6 0 1 1 12 0A6 6 0 0 1 8 14Z" fill="white" fill-opacity=".2"/>
+        <circle cx="14" cy="14" r="3.5" fill="white"/>
+      </svg>
+      <span class="topbar-wordmark">RingCentral</span>
+    </a>
+    <span class="topbar-sep">|</span>
+    <span class="topbar-product">ACE Transcript Downloader</span>
+    <span class="topbar-badge">Demo</span>
+  </header>
+
+  <!-- Step dots -->
+  <div class="steps-nav" id="stepsNav">
+    <div class="step-dot active" id="dot0"></div>
+    <div class="step-dot" id="dot1"></div>
+    <div class="step-dot" id="dot2"></div>
+    <div class="step-dot" id="dot3"></div>
+  </div>
+
+  <main class="main">
+    <div class="card">
+
+      <!-- Hero -->
+      <div class="card-hero">
+        <div class="hero-eyebrow">RingSense AI</div>
+        <div class="hero-title">Download Call Transcripts</div>
+        <div class="hero-sub">Export all RingSense transcripts for any account to Excel &amp; PDF</div>
+      </div>
+
+      <div class="card-body">
+
+        <!-- ── STEP 0: Credentials ──────────────────────────── -->
+        <div class="step active" id="step0">
+          <div class="step-label">Step 1 of 4</div>
+          <div class="step-title">Enter Credentials</div>
+
+          <div class="info-box">
+            You need three values from <a href="https://developers.ringcentral.com" target="_blank">developers.ringcentral.com</a>:<br>
+            <strong>Client ID</strong> and <strong>Client Secret</strong> from the Credentials tab, plus a
+            <strong>JWT Token</strong> from the Auth tab. Credentials are sent securely and never stored.
+          </div>
+
+          <div id="alertStep0" class="alert alert-error"></div>
+
+          <div class="form-group">
+            <label>Customer / Account Name <span class="req">*</span></label>
+            <input type="text" id="customerName" placeholder="Acme Corporation">
+          </div>
+
+          <div class="form-group">
+            <label>Client ID <span class="req">*</span></label>
+            <input type="text" id="clientId" class="mono" placeholder="AbCdEfGhIjKlMnOp">
+          </div>
+
+          <div class="form-group">
+            <label>Client Secret <span class="req">*</span></label>
+            <div class="input-group">
+              <input type="password" id="clientSecret" class="mono" placeholder="••••••••••••••••••••">
+              <button type="button" class="toggle-pw" onclick="togglePw('clientSecret', this)">Show</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>JWT Token <span class="req">*</span></label>
+            <div class="input-group">
+              <input type="password" id="jwtToken" class="mono" placeholder="eyJhbGciOiJSUzI1NiJ9…">
+              <button type="button" class="toggle-pw" onclick="togglePw('jwtToken', this)">Show</button>
+            </div>
+            <div class="input-hint">Make sure the RingSense scope is approved and the JWT was regenerated after.</div>
+          </div>
+
+          <button class="btn btn-primary" id="btnAuthenticate" onclick="doAuthenticate()">
+            <div class="spinner" id="spinAuth"></div>
+            <span id="btnAuthText">Connect to RingCentral</span>
+          </button>
+        </div>
+
+        <!-- ── STEP 1: Auth result + date range ─────────────── -->
+        <div class="step" id="step1">
+          <div class="step-label">Step 2 of 4</div>
+          <div class="step-title">Configure Download</div>
+
+          <div class="auth-success" id="authSuccessBox">
+            <div class="auth-success-title">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <circle cx="8" cy="8" r="8" fill="#12B76A"/>
+                <path d="M4.5 8l2.5 2.5 4.5-5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              Authenticated successfully
+            </div>
+            <div class="auth-success-detail" id="authDetail"></div>
+          </div>
+
+          <div class="scope-warn" id="scopeWarn">
+            ⚠️ <strong>RingSense scope not detected.</strong> Transcripts may not be available.
+            Ensure the RingSense scope is approved and regenerate the JWT token.
+          </div>
+
+          <div id="alertStep1" class="alert alert-error"></div>
+
+          <div class="form-group">
+            <label>Customer Name</label>
+            <input type="text" id="customerName2" placeholder="Acme Corporation">
+          </div>
+
+          <div class="form-group">
+            <label>Date Range</label>
+            <div class="date-presets">
+              <button class="preset-btn" onclick="setPreset(7, this)">Last 7 days</button>
+              <button class="preset-btn active" onclick="setPreset(30, this)">Last 30 days</button>
+              <button class="preset-btn" onclick="setPreset(90, this)">Last 90 days</button>
+              <button class="preset-btn" onclick="setPreset(0, this)">Custom</button>
+            </div>
+            <div class="form-row">
+              <div class="form-group" style="margin-bottom:0">
+                <label>From</label>
+                <input type="date" id="dateFrom">
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label>To</label>
+                <input type="date" id="dateTo">
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="goStep(0)">← Back</button>
+            <button class="btn btn-primary" onclick="doStartJob()">
+              <div class="spinner" id="spinStart"></div>
+              <span id="btnStartText">Start Download</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- ── STEP 2: Running ───────────────────────────────── -->
+        <div class="step" id="step2">
+          <div class="step-label">Step 3 of 4</div>
+          <div class="step-title">Downloading Transcripts</div>
+
+          <div class="progress-wrap">
+            <div class="progress-header">
+              <span id="progressLabel">Starting…</span>
+              <span id="progressPct">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="progressFill"></div>
+            </div>
+          </div>
+
+          <div class="log-console" id="logConsole"></div>
+
+          <div id="alertStep2" class="alert"></div>
+        </div>
+
+        <!-- ── STEP 3: Done ──────────────────────────────────── -->
+        <div class="step" id="step3">
+          <div class="step-label">Step 4 of 4</div>
+          <div class="step-title">Download Files</div>
+
+          <div class="summary-grid" id="summaryGrid">
+            <div class="stat-card">
+              <div class="stat-num" id="statTotal">—</div>
+              <div class="stat-label">Total Calls</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="statTranscripts">—</div>
+              <div class="stat-label">Transcripts</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-num" id="statRange">—</div>
+              <div class="stat-label">Date Range</div>
+            </div>
+          </div>
+
+          <div class="download-row">
+            <a class="dl-btn" id="dlXlsx" href="#" onclick="return false;">
+              <div class="dl-btn-icon xlsx">📊</div>
+              <div class="dl-btn-text">
+                <strong>Excel</strong>
+                <span>All calls + transcripts</span>
+              </div>
+            </a>
+            <a class="dl-btn" id="dlPdf" href="#" onclick="return false;">
+              <div class="dl-btn-icon pdf">📄</div>
+              <div class="dl-btn-text">
+                <strong>PDF Report</strong>
+                <span>Formatted, printable</span>
+              </div>
+            </a>
+          </div>
+
+          <button class="btn btn-ghost" style="width:100%" onclick="goStep(1)">
+            ↩ Run Again for Another Customer
+          </button>
+        </div>
+
+      </div><!-- /card-body -->
+    </div><!-- /card -->
+  </main>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────
+let currentStep = 0;
+let jobId       = null;
+let pollTimer   = null;
+let authData    = null;
+
+// ── Utilities ─────────────────────────────────────────
+function goStep(n) {
+  document.querySelectorAll('.step').forEach((el,i) => {
+    el.classList.toggle('active', i === n);
+  });
+  document.querySelectorAll('.step-dot').forEach((el,i) => {
+    el.className = 'step-dot' + (i < n ? ' done' : i === n ? ' active' : '');
+  });
+  currentStep = n;
+}
+
+function showAlert(id, msg, type='error') {
+  const el = document.getElementById(id);
+  el.className = 'alert alert-' + type + ' visible';
+  el.textContent = msg;
+}
+
+function hideAlert(id) {
+  document.getElementById(id).className = 'alert alert-' + type;
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.textContent = 'Hide';
+  } else {
+    inp.type = 'password';
+    btn.textContent = 'Show';
+  }
+}
+
+function setPreset(days, btn) {
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const to = new Date();
+  const toStr = to.toISOString().split('T')[0];
+  document.getElementById('dateTo').value = toStr;
+
+  if (days === 0) {
+    // custom — just clear
+    document.getElementById('dateFrom').value = '';
+    return;
+  }
+
+  const from = new Date(to);
+  from.setDate(from.getDate() - days);
+  document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
+}
+
+// ── Default dates ─────────────────────────────────────
+(function initDates() {
+  const today = new Date();
+  const from  = new Date(today);
+  from.setDate(from.getDate() - 30);
+  document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
+  document.getElementById('dateTo').value   = today.toISOString().split('T')[0];
+})();
+
+// ── Authenticate ──────────────────────────────────────
+async function doAuthenticate() {
+  const btn  = document.getElementById('btnAuthenticate');
+  const spin = document.getElementById('spinAuth');
+  const txt  = document.getElementById('btnAuthText');
+
+  const customerName = document.getElementById('customerName').value.trim();
+  const clientId     = document.getElementById('clientId').value.trim();
+  const clientSecret = document.getElementById('clientSecret').value.trim();
+  const jwtToken     = document.getElementById('jwtToken').value.trim();
+
+  if (!customerName || !clientId || !clientSecret || !jwtToken) {
+    showAlert('alertStep0', 'All fields are required.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  spin.classList.add('visible');
+  txt.textContent = 'Connecting…';
+  document.getElementById('alertStep0').className = 'alert alert-error';
+
+  try {
+    const res  = await fetch('/api/authenticate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, jwt_token: jwtToken }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showAlert('alertStep0', data.error || 'Authentication failed.', 'error');
+      return;
+    }
+
+    authData = data;
+
+    // Populate step 2
+    document.getElementById('customerName2').value = customerName;
+    document.getElementById('authDetail').textContent =
+      `Account ID: ${data.account_id}  ·  Scopes: ${data.scope_preview}`;
+
+    if (!data.has_ringsense) {
+      document.getElementById('scopeWarn').classList.add('visible');
+    }
+
+    goStep(1);
+
+  } catch (e) {
+    showAlert('alertStep0', 'Network error — check your connection.', 'error');
+  } finally {
+    btn.disabled = false;
+    spin.classList.remove('visible');
+    txt.textContent = 'Connect to RingCentral';
+  }
+}
+
+// ── Start job ─────────────────────────────────────────
+async function doStartJob() {
+  const btn     = document.getElementById('btnStartText').parentElement;
+  const spin    = document.getElementById('spinStart');
+  const txt     = document.getElementById('btnStartText');
+
+  const customer = document.getElementById('customerName2').value.trim() || 'Customer';
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo   = document.getElementById('dateTo').value;
+
+  if (!dateFrom || !dateTo) {
+    showAlert('alertStep1', 'Please select a date range.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  spin.classList.add('visible');
+  txt.textContent = 'Starting…';
+
+  try {
+    const res  = await fetch('/api/start-job', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customer_name: customer, date_from: dateFrom, date_to: dateTo }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showAlert('alertStep1', data.error || 'Failed to start job.', 'error');
+      return;
+    }
+
+    jobId = data.job_id;
+    goStep(2);
+    startPolling();
+
+  } catch (e) {
+    showAlert('alertStep1', 'Network error — check connection.', 'error');
+  } finally {
+    btn.disabled = false;
+    spin.classList.remove('visible');
+    txt.textContent = 'Start Download';
+  }
+}
+
+// ── Poll job ──────────────────────────────────────────
+function startPolling() {
+  pollTimer = setInterval(pollJob, 1500);
+}
+
+let seenLogs = 0;
+
+async function pollJob() {
+  if (!jobId) return;
+  try {
+    const res  = await fetch(`/api/job/${jobId}`);
+    const data = await res.json();
+
+    // Progress bar
+    const pct = data.progress || 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent  = pct + '%';
+
+    const labels = ['Starting up…','Fetching call log…','Downloading transcripts…','Building files…','Finalizing…'];
+    const li = Math.min(Math.floor(pct / 20), labels.length - 1);
+    if (pct < 100) document.getElementById('progressLabel').textContent = labels[li];
+    else           document.getElementById('progressLabel').textContent = 'Complete!';
+
+    // Append new log lines
+    const console_ = document.getElementById('logConsole');
+    const logs = data.log || [];
+    const newLogs = logs.slice(seenLogs);
+    seenLogs = logs.length;
+
+    newLogs.forEach(line => {
+      const row  = document.createElement('div');
+      row.className = 'log-line';
+      const ts   = document.createElement('span');
+      ts.className = 'log-ts';
+      ts.textContent = line.t;
+      const msg  = document.createElement('span');
+      msg.className = `log-${line.level || 'info'}`;
+      msg.textContent = line.msg;
+      row.appendChild(ts);
+      row.appendChild(msg);
+      console_.appendChild(row);
+    });
+
+    if (newLogs.length) {
+      console_.scrollTop = console_.scrollHeight;
+    }
+
+    if (data.status === 'done') {
+      clearInterval(pollTimer);
+      showDoneStep(data);
+    } else if (data.status === 'error') {
+      clearInterval(pollTimer);
+      document.getElementById('alertStep2').className = 'alert alert-error visible';
+      document.getElementById('alertStep2').textContent = 'Error: ' + (data.error || 'Unknown error');
+    }
+
+  } catch (e) {
+    // network blip — keep polling
+  }
+}
+
+// ── Done step ─────────────────────────────────────────
+function showDoneStep(data) {
+  const s = data.summary || {};
+  document.getElementById('statTotal').textContent       = s.total       ?? '—';
+  document.getElementById('statTranscripts').textContent = s.transcripts ?? '—';
+  document.getElementById('statRange').textContent       = s.date_from && s.date_to
+    ? s.date_from.slice(5) + ' – ' + s.date_to.slice(5) : '—';
+
+  const files = data.files || [];
+  const base  = `/api/download/${jobId}/`;
+
+  const xlsxBtn = document.getElementById('dlXlsx');
+  const pdfBtn  = document.getElementById('dlPdf');
+
+  if (files.includes('xlsx')) {
+    xlsxBtn.href    = base + 'xlsx';
+    xlsxBtn.onclick = null;
+  }
+  if (files.includes('pdf')) {
+    pdfBtn.href    = base + 'pdf';
+    pdfBtn.onclick = null;
+  }
+
+  setTimeout(() => goStep(3), 600);
+}
+
+// Enter key on last credential field
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('jwtToken').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doAuthenticate();
+  });
+});
+</script>
+</body>
+</html>
