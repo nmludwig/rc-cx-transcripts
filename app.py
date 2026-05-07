@@ -50,7 +50,7 @@ def login():
     state = secrets.token_urlsafe(16)
     session["oauth_state"] = state
     params = {"response_type": "code", "client_id": RC_CLIENT_ID,
-              "redirect_uri": RC_REDIRECT_URI, "state": state}
+              "redirect_uri": RC_REDIRECT_URI, "state": state, "scope": "ReadCallLog ReadCallRecording RingSense ReadAccounts Analytics ReadContacts"}
     return redirect(RC_AUTH_URL + "?" + urlencode(params))
 
 
