@@ -166,6 +166,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
     job = jobs[job_id]
     try:
         job_log(job_id, f"Starting download for {customer_name}")
+        job_log(job_id, f"Account ID: {account_id}", "info")
         job_log(job_id, f"Date range: {date_from} → {date_to}")
         job["progress"] = 5
 
