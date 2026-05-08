@@ -1,119 +1,88 @@
-# RingCentral ACE Transcript Downloader — Web App
+# RingCentral ACE Transcript Downloader
 
-A polished web UI wrapping the `download_transcripts.py` CLI script.  
-Users enter their RingCentral credentials, choose a date range, watch live progress,  
-then download finished Excel + PDF reports.
+A web app that lets any RingCentral admin log in and export all their ACE call transcripts to Excel and PDF with one click.
+
+**Live demo:** https://rc-transcripts.onrender.com
 
 ---
 
-## What's Included
+## What It Does
+
+1. Admin visits the URL and clicks **Login with RingCentral**
+2. They authenticate with their RingCentral admin credentials (handled directly by RingCentral — no credentials are stored)
+3. They enter a customer/account name and pick a date range (7, 30, 90 days or custom)
+4. The app pulls every recorded call from the call log, fetches the ACE AI transcript, summary, and sentiment for each one, and shows a live progress log
+5. When complete, the admin downloads:
+   - **Excel spreadsheet** — Summary tab, All Calls tab, Transcripts tab
+   - **PDF report** — formatted call-by-call transcripts with speaker labels, sentiment badges, and AI summaries
+
+Downloads take about 1.5 seconds per call due to RingCentral API rate limits.
+
+---
+
+## Files
 
 ```
-rc_transcripts/
 ├── app.py              ← Flask server (all backend logic)
 ├── requirements.txt    ← Python dependencies
 ├── README.md           ← This file
 ├── templates/
-│   └── index.html      ← Full single-page UI (4-step wizard)
+│   ├── index.html      ← Single-page UI (3-step wizard)
+│   └── error.html      ← OAuth error page
 └── outputs/            ← Generated files saved here (auto-created)
 ```
 
 ---
 
-## Quick Start (Local)
+## Setup (Local)
 
 ```bash
-# 1. Install dependencies
 pip install -r requirements.txt
-
-# 2. Run the dev server
-python app.py
-
-# 3. Open http://localhost:5000
+gunicorn -w 2 -k gthread --threads 4 --timeout 300 -b 0.0.0.0:5000 app:app
 ```
 
----
-
-## Production Deploy
-
-### Option A — Any Linux VPS (nginx + gunicorn)
-
-```bash
-# Install
-pip install -r requirements.txt
-
-# Run with gunicorn (4 workers)
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-
-# Or with a custom secret key
-FLASK_SECRET=your-secret-here gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
-
-**nginx config** (`/etc/nginx/sites-available/rc-transcripts`):
-
-```nginx
-server {
-    listen 80;
-    server_name yourdomain.com;
-
-    client_max_body_size 50M;
-
-    location / {
-        proxy_pass         http://127.0.0.1:5000;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_read_timeout 300s;   # allow long transcript fetches
-        proxy_send_timeout 300s;
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/rc-transcripts /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
+Open **http://localhost:5000**
 
 ---
 
-### Option B — Render.com (free tier)
+## Deploy on Render
 
-1. Push this folder to a GitHub repo
-2. New Web Service → Python → Build: `pip install -r requirements.txt`
-3. Start command: `gunicorn -w 2 -b 0.0.0.0:$PORT app:app`
-4. Set env var `FLASK_SECRET` to a random string
+1. Push this repo to GitHub
+2. **Render → New Web Service** → connect your repo
+3. Set these values:
+   - **Build command:** `pip install -r requirements.txt`
+   - **Start command:** `gunicorn -w 2 -k gthread --threads 4 --timeout 300 -b 0.0.0.0:$PORT app:app`
+4. Add environment variables:
 
----
-
-### Option C — Railway / Fly.io
-
-Both auto-detect `requirements.txt`. Set `PORT` and `FLASK_SECRET` env vars.  
-Start command: `gunicorn app:app`
-
----
-
-## Environment Variables
-
-| Variable       | Default                          | Description                  |
-|----------------|----------------------------------|------------------------------|
-| `PORT`         | `5000`                           | Port to listen on            |
-| `FLASK_SECRET` | `rc-ace-demo-secret-change-in-prod` | Session signing key — **change this in production** |
+| Variable | Description |
+|---|---|
+| `RC_CLIENT_ID` | Your RingCentral app Client ID |
+| `RC_CLIENT_SECRET` | Your RingCentral app Client Secret |
+| `RC_REDIRECT_URI` | `https://your-app.onrender.com/oauth/callback` |
+| `FLASK_SECRET` | Any random string for session signing |
 
 ---
 
-## JWT Auth Flow
+## RingCentral App Setup (developers.ringcentral.com)
 
-1. User enters Client ID, Client Secret, and JWT Token in the browser
-2. The server POSTs to `https://platform.ringcentral.com/restapi/oauth/token`  
-   using the `urn:ietf:params:oauth:grant-type:jwt-bearer` grant type
-3. On success, the server stores the `access_token` in the **server-side Flask session**  
-   (never returned to the browser)
-4. Subsequent API calls use the stored token — credentials are never persisted to disk
+Your RingCentral app needs:
+- **Auth type:** 3-legged OAuth — Server-side web app
+- **OAuth Redirect URI:** `https://your-app.onrender.com/oauth/callback`
+- **Scopes:** Analytics, Read Accounts, Read Call Log, Read Call Recording, Read Contacts, RingSense
+
+---
+
+## Auth Flow
+
+- Users authenticate via **RingCentral OAuth** (Authorization Code flow)
+- The server stores the access token and refresh token in a server-side session — never exposed to the browser
+- Tokens are automatically refreshed every 50 calls during long downloads to prevent expiry on large accounts
+- Credentials are never saved to disk
 
 ---
 
 ## Notes
 
-- **Credentials are never saved.** They exist only in memory for the duration of the session.
-- Long-running jobs run in a background thread; the browser polls `/api/job/<id>` every 1.5 s.
-- Output files are written to `outputs/` and served via `/api/download/<job_id>/<type>`.
-- For production, consider adding auth in front of the app (e.g., Basic Auth via nginx).
+- Only calls with ACE/RingSense licenses assigned will have transcripts — calls without licenses show "No transcript available"
+- The RingSense public API must be enabled for the account by RingCentral support
+- Output files are served via `/api/download/<job_id>/<type>` and exist for the duration of the server session
