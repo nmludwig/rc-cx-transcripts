@@ -217,7 +217,6 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
                         job_log(job_id, "Rate limit hit — waiting 65 s…", "warn")
                         time.sleep(65)
                         continue
-                    job_log(job_id, f"RingSense status: {r.status_code} for {recording_id} - {r.text[:200]}", "info")
                     if r.status_code == 200:
                         insights = r.json()
                     break
