@@ -202,7 +202,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
         with_transcripts = 0
 
         for i, call in enumerate(records):
-            recording_id = call.get("id", "")
+            recording_id = call.get("recording", {}).get("id")
             if not recording_id:
                 continue
 
