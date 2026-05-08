@@ -190,6 +190,8 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
 
         job["progress"] = 15
         job_log(job_id, f"Found {len(records)} recorded calls", "ok")
+        for dbg in records[:3]:
+            job_log(job_id, f"SAMPLE: id={dbg.get('id','')} rec_id={dbg.get('recording',{}).get('id','')} time={dbg.get('startTime','')[:10]}", "info")
 
         if not records:
             job.update({"status": "done", "progress": 100, "summary": {"total": 0, "transcripts": 0}})
