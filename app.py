@@ -562,9 +562,13 @@ def debug_token():
     if not session.get("rc_token"):
         return "not logged in"
     import requests
+    headers = {
+        "Authorization": "Bearer " + session["rc_token"],
+        "organizationid": "d0e902ac-6613-455c-9afb-62e57b8574e9"
+    }
     r = requests.get(
-        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records",
-        headers={"Authorization": "Bearer " + session["rc_token"]},
+        "https://api.ringsense.ringcentral.com/rest/v1.0/calls",
+        headers=headers,
         params={"perPage": 5}
     )
     return f"Status: {r.status_code}<br><pre>{r.text[:3000]}</pre>"
@@ -577,7 +581,7 @@ def debug_ringsense2():
     token = session["rc_token"]
     results = []
     urls = [
-        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records",
+        "https://api.ringsense.ringcentral.com/rest/v1.0/calls",
         "https://platform.ringcentral.com/ai/ringsense/v1/accounts/~/domains/pbx/records",
         "https://platform.ringcentral.com/ringsense/v1/accounts/~/records",
         "https://ringex.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records",
