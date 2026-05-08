@@ -178,7 +178,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
                 headers={"Authorization": "Bearer " + token},
                 params={"view": "Detailed", "dateFrom": date_from + "T00:00:00Z",
                         "dateTo": date_to + "T23:59:59Z", "type": "Voice",
-                        "perPage": 250, "page": page},
+                        "withRecording": "true", "perPage": 250, "page": page},
                 timeout=30)
             resp.raise_for_status()
             data = resp.json()
@@ -190,8 +190,6 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
 
         job["progress"] = 15
         job_log(job_id, f"Found {len(records)} recorded calls", "ok")
-        for dbg in records[:10]:
-            job_log(job_id, f"SAMPLE: id={dbg.get('id','')} rec_id={dbg.get('recording',{}).get('id','')} time={dbg.get('startTime','')[:10]}", "info")
 
         if not records:
             job.update({"status": "done", "progress": 100, "summary": {"total": 0, "transcripts": 0}})
@@ -558,30 +556,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  RingCentral ACE Web App → http://localhost:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
-
-@app.route("/debug-token")
-def debug_token():
-    if not session.get("rc_token"):
-        return "not logged in"
-    import requests
-    token = session["rc_token"]
-    org_id = "d0e902ac-6613-455c-9afb-62e57b8574e9"
-    results = []
-    payloads = [
-        {"rcAccessToken": token},
-        {"accessToken": token},
-        {"token": token},
-        {"rcToken": token},
-        {"rc_access_token": token},
-    ]
-    for p in payloads:
-        r = requests.post(
-            "https://api.ringsense.ringcentral.com/rest/v1.0/users/login",
-            headers={"Content-Type": "application/json"},
-            json=p
-        )
-        results.append(f"<b>{list(p.keys())[0]}</b>: {r.status_code} {r.text[:200]}<br><br>")
-    return "".join(results)
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
