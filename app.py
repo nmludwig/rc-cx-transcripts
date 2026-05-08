@@ -568,3 +568,21 @@ def debug_token():
         params={"perPage": 5}
     )
     return f"Status: {r.status_code}<br><pre>{r.text[:3000]}</pre>"
+
+@app.route("/debug-ringsense2")
+def debug_ringsense2():
+    if not session.get("rc_token"):
+        return "not logged in"
+    import requests
+    token = session["rc_token"]
+    results = []
+    urls = [
+        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records",
+        "https://platform.ringcentral.com/ai/ringsense/v1/accounts/~/domains/pbx/records",
+        "https://platform.ringcentral.com/ringsense/v1/accounts/~/records",
+        "https://ringex.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records",
+    ]
+    for url in urls:
+        r = requests.get(url, headers={"Authorization": "Bearer " + token}, params={"perPage": 1})
+        results.append(f"{r.status_code} — {url}<br>{r.text[:200]}<br><br>")
+    return "<br>".join(results)
