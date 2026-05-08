@@ -561,25 +561,24 @@ if __name__ == "__main__":
 def debug_token():
     if not session.get("rc_token"):
         return "not logged in"
-    import requests, base64, json
+    import requests
     token = session["rc_token"]
-    # Decode the RC token to see scopes
-    try:
-        parts = token.split('.')
-        if len(parts) == 3:
-            padded = parts[1] + '=' * (4 - len(parts[1]) % 4)
-            decoded = json.loads(base64.b64decode(padded))
-            token_info = f"<pre>{json.dumps(decoded, indent=2)}</pre>"
-        else:
-            token_info = f"<pre>Not a JWT: {token[:100]}</pre>"
-    except Exception as e:
-        token_info = f"<pre>Decode error: {e} -- token starts: {token[:100]}</pre>"
-    # Also check scopes via RC API
+    account_id = session.get("rc_account_id", "~")
     r = requests.get(
-        "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~",
-        headers={"Authorization": "Bearer " + token})
-    ext_info = f"<pre>{r.text[:500]}</pre>"
-    return f"<b>Token decode:</b>{token_info}<b>Extension:</b>{ext_info}"
+        f"https://platform.ringcentral.com/restapi/v1.0/account/{account_id}/call-log",
+        headers={"Authorization": "Bearer " + token},
+        params={"view": "Detailed", "type": "Voice", "withRecording": "true", "perPage": 5},
+        timeout=30)
+    import json
+    calls = r.json().get("records", [])
+    results = []
+    for c in calls:
+        rec_id = c.get("recording", {}).get("id", "none")
+        call_id = c.get("id", "none")
+        start = c.get("startTime", "")[:16]
+        frm = c.get("from", {}).get("name", "") or c.get("from", {}).get("phoneNumber", "")
+        results.append(f"<b>{start}</b> from={frm} call_id={call_id} recording_id={rec_id}<br>")
+    return "".join(results)
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
