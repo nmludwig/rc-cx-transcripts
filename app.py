@@ -565,22 +565,24 @@ def debug_token():
         return "not logged in"
     import requests
     token = session["rc_token"]
-    account_id = session.get("rc_account_id", "~")
-    r = requests.get(
-        f"https://platform.ringcentral.com/restapi/v1.0/account/{account_id}/call-log",
-        headers={"Authorization": "Bearer " + token},
-        params={"view": "Detailed", "type": "Voice", "withRecording": "true", "perPage": 5},
-        timeout=30)
-    import json
-    calls = r.json().get("records", [])
-    results = []
-    for c in calls:
-        rec_id = c.get("recording", {}).get("id", "none")
-        call_id = c.get("id", "none")
-        start = c.get("startTime", "")[:16]
-        frm = c.get("from", {}).get("name", "") or c.get("from", {}).get("phoneNumber", "")
-        results.append(f"<b>{start}</b> from={frm} call_id={call_id} recording_id={rec_id}<br>")
-    return "".join(results)
+    org_id = "d0e902ac-6613-455c-9afb-62e57b8574e9"
+    # Try to get RingSense session token by posting our RC token
+    r = requests.post(
+        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/login",
+        headers={"Content-Type": "application/json"},
+        json={"rcAccessToken": token, "organizationId": org_id}
+    )
+    r2 = requests.post(
+        "https://api.ringsense.ringcentral.com/rest/v1.0/users/login",
+        headers={"Content-Type": "application/json"},
+        json={"rcAccessToken": token, "organizationId": org_id}
+    )
+    r3 = requests.post(
+        "https://api.ringsense.ringcentral.com/rest/v1.0/integrations/status",
+        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+        json={"organizationId": org_id}
+    )
+    return f"login: {r.status_code} {r.text[:200]}<br><br>users/login: {r2.status_code} {r2.text[:200]}<br><br>integrations/status: {r3.status_code} {r3.text[:200]}"
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
