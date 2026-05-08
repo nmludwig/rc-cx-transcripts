@@ -566,23 +566,22 @@ def debug_token():
     import requests
     token = session["rc_token"]
     org_id = "d0e902ac-6613-455c-9afb-62e57b8574e9"
-    # Try to get RingSense session token by posting our RC token
-    r = requests.post(
-        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/login",
-        headers={"Content-Type": "application/json"},
-        json={"rcAccessToken": token, "organizationId": org_id}
-    )
-    r2 = requests.post(
-        "https://api.ringsense.ringcentral.com/rest/v1.0/users/login",
-        headers={"Content-Type": "application/json"},
-        json={"rcAccessToken": token, "organizationId": org_id}
-    )
-    r3 = requests.post(
-        "https://api.ringsense.ringcentral.com/rest/v1.0/integrations/status",
-        headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
-        json={"organizationId": org_id}
-    )
-    return f"login: {r.status_code} {r.text[:200]}<br><br>users/login: {r2.status_code} {r2.text[:200]}<br><br>integrations/status: {r3.status_code} {r3.text[:200]}"
+    results = []
+    payloads = [
+        {"rcAccessToken": token},
+        {"accessToken": token},
+        {"token": token},
+        {"rcToken": token},
+        {"rc_access_token": token},
+    ]
+    for p in payloads:
+        r = requests.post(
+            "https://api.ringsense.ringcentral.com/rest/v1.0/users/login",
+            headers={"Content-Type": "application/json"},
+            json=p
+        )
+        results.append(f"<b>{list(p.keys())[0]}</b>: {r.status_code} {r.text[:200]}<br><br>")
+    return "".join(results)
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
