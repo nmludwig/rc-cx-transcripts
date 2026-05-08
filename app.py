@@ -563,11 +563,23 @@ def debug_token():
         return "not logged in"
     import requests
     token = session["rc_token"]
-    # Get token info to see scopes and extension
-    r = requests.get(
-        "https://platform.ringcentral.com/restapi/oauth/tokeninfo",
+    results = []
+    # Check extension info
+    r1 = requests.get(
+        "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~",
         headers={"Authorization": "Bearer " + token})
-    return f"Status: {r.status_code}<br><pre>{r.text[:3000]}</pre>"
+    results.append(f"<b>Extension:</b> {r1.status_code}<br><pre>{r1.text[:500]}</pre>")
+    # Try RingSense with a known recording
+    r2 = requests.get(
+        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records/3559043026020/insights",
+        headers={"Authorization": "Bearer " + token})
+    results.append(f"<b>RingSense pbx:</b> {r2.status_code}<br><pre>{r2.text[:500]}</pre>")
+    # Try with account id
+    r3 = requests.get(
+        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/1363409020/domains/pbx/records/3559043026020/insights",
+        headers={"Authorization": "Bearer " + token})
+    results.append(f"<b>RingSense acct:</b> {r3.status_code}<br><pre>{r3.text[:500]}</pre>")
+    return "".join(results)
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
