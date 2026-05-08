@@ -562,16 +562,14 @@ def debug_token():
     if not session.get("rc_token"):
         return "not logged in"
     import requests
-    headers = {
-        "Authorization": "Bearer " + session["rc_token"],
-        "organizationid": "d0e902ac-6613-455c-9afb-62e57b8574e9"
-    }
-    r = requests.get(
-        "https://api.ringsense.ringcentral.com/rest/v1.0/calls",
-        headers=headers,
-        params={"perPage": 5}
-    )
-    return f"Status: {r.status_code}<br><pre>{r.text[:3000]}</pre>"
+    token = session["rc_token"]
+    recording_id = "3559043026020"
+    results = []
+    for domain in ["pbx", "ucaas", "cc", "ringsense"]:
+        url = f"https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/{domain}/records/{recording_id}/insights"
+        r = requests.get(url, headers={"Authorization": "Bearer " + token})
+        results.append(f"<b>{domain}</b>: {r.status_code} — {r.text[:200]}<br><br>")
+    return "".join(results)
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
