@@ -104,6 +104,8 @@ def oauth_callback():
     session["rc_token"]        = token
     session["rc_account_id"]   = account_id
     session["rc_display_name"] = display_name
+    session["rc_refresh_token"] = data.get("refresh_token", "")
+    session["rc_token_time"]    = datetime.now().timestamp()
     session.pop("oauth_state", None)
     return redirect(url_for("index"))
 
@@ -162,7 +164,23 @@ def job_log(job_id, msg, level="info"):
                                  "msg": msg, "level": level})
 
 
-def run_download_job(job_id, token, account_id, customer_name, date_from, date_to):
+def refresh_rc_token(refresh_token):
+    """Exchange refresh token for a new access token."""
+    try:
+        resp = requests.post(
+            RC_TOKEN_URL,
+            auth=(RC_CLIENT_ID, RC_CLIENT_SECRET),
+            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
+            timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("access_token"), data.get("refresh_token", refresh_token)
+    except Exception:
+        pass
+    return None, refresh_token
+
+
+def run_download_job(job_id, token, account_id, customer_name, date_from, date_to, refresh_token=""):
     job = jobs[job_id]
     try:
         job_log(job_id, f"Starting download for {customer_name}")
@@ -265,6 +283,12 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
 
             if (i + 1) % 10 == 0:
                 job_log(job_id, f"Processed {i+1}/{total} calls ({with_transcripts} transcripts so far)")
+            # Refresh token every 50 calls to prevent expiry on large accounts
+            if refresh_token and (i + 1) % 50 == 0:
+                new_token, refresh_token = refresh_rc_token(refresh_token)
+                if new_token:
+                    token = new_token
+                    job_log(job_id, "Access token refreshed — continuing download…", "ok")
             time.sleep(1.5)
 
         job_log(job_id, f"{with_transcripts} of {total} calls have transcripts", "ok")
