@@ -556,3 +556,15 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f"\n  RingCentral ACE Web App → http://localhost:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=False)
+
+@app.route("/debug-token")
+def debug_token():
+    if not session.get("rc_token"):
+        return "not logged in"
+    import requests
+    r = requests.get(
+        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records",
+        headers={"Authorization": "Bearer " + session["rc_token"]},
+        params={"perPage": 5}
+    )
+    return f"Status: {r.status_code}<br><pre>{r.text[:3000]}</pre>"
