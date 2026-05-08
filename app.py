@@ -561,20 +561,25 @@ if __name__ == "__main__":
 def debug_token():
     if not session.get("rc_token"):
         return "not logged in"
-    import requests
+    import requests, base64, json
     token = session["rc_token"]
-    org_id = "d0e902ac-6613-455c-9afb-62e57b8574e9"
-    hdrs = {"Authorization": "Bearer " + token, "organizationid": org_id}
-    results = []
-    for url in [
-        "https://api.ringsense.ringcentral.com/rest/v1.0/calls?limit=5",
-        "https://api.ringsense.ringcentral.com/rest/v1.0/calls/count",
-        "https://api.ringsense.ringcentral.com/api-temp/v1/calls?limit=5",
-        "https://api.ringsense.ringcentral.com/api-temp/v1/notifications/unread/count",
-    ]:
-        r = requests.get(url, headers=hdrs) if "count" not in url else requests.post(url, headers=hdrs)
-        results.append(f"<b>{url.split('.com/')[1]}</b>: {r.status_code} {r.text[:300]}<br><br>")
-    return "".join(results)
+    # Decode the RC token to see scopes
+    try:
+        parts = token.split('.')
+        if len(parts) == 3:
+            padded = parts[1] + '=' * (4 - len(parts[1]) % 4)
+            decoded = json.loads(base64.b64decode(padded))
+            token_info = f"<pre>{json.dumps(decoded, indent=2)}</pre>"
+        else:
+            token_info = f"<pre>Not a JWT: {token[:100]}</pre>"
+    except Exception as e:
+        token_info = f"<pre>Decode error: {e} -- token starts: {token[:100]}</pre>"
+    # Also check scopes via RC API
+    r = requests.get(
+        "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~",
+        headers={"Authorization": "Bearer " + token})
+    ext_info = f"<pre>{r.text[:500]}</pre>"
+    return f"<b>Token decode:</b>{token_info}<b>Extension:</b>{ext_info}"
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
