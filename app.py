@@ -564,16 +564,16 @@ def debug_token():
     import requests
     token = session["rc_token"]
     org_id = "d0e902ac-6613-455c-9afb-62e57b8574e9"
+    hdrs = {"Authorization": "Bearer " + token, "organizationid": org_id}
     results = []
-    for url, body in [
-        ("https://api.ringsense.ringcentral.com/rest/v1.0/integrations/rc/token", {"rcAccessToken": token}),
-        ("https://api.ringsense.ringcentral.com/rest/v1.0/auth/rc", {"rcAccessToken": token}),
-        ("https://api.ringsense.ringcentral.com/api-temp/v1/auth/rc-token", {"rcAccessToken": token}),
-        ("https://api.ringsense.ringcentral.com/api-temp/v1/auth/token", {"rcAccessToken": token}),
-        ("https://api.ringsense.ringcentral.com/rest/v1.0/auth/sso", {"token": token}),
+    for url in [
+        "https://api.ringsense.ringcentral.com/rest/v1.0/calls?limit=5",
+        "https://api.ringsense.ringcentral.com/rest/v1.0/calls/count",
+        "https://api.ringsense.ringcentral.com/api-temp/v1/calls?limit=5",
+        "https://api.ringsense.ringcentral.com/api-temp/v1/notifications/unread/count",
     ]:
-        r = requests.post(url, headers={"Authorization": "Bearer " + token, "organizationid": org_id, "Content-Type": "application/json"}, json=body)
-        results.append(f"<b>{url.split('.com/')[1]}</b>: {r.status_code} {r.text[:200]}<br><br>")
+        r = requests.get(url, headers=hdrs) if "count" not in url else requests.post(url, headers=hdrs)
+        results.append(f"<b>{url.split('.com/')[1]}</b>: {r.status_code} {r.text[:300]}<br><br>")
     return "".join(results)
 
 @app.route("/debug-ringsense2")
