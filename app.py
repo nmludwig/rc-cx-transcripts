@@ -209,7 +209,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
             job["progress"] = 15 + int(70 * (i / max(total, 1)))
             insights = None
             url = ("https://platform.ringcentral.com/ai/ringsense/v1/public"
-                   f"/accounts/~/domains/pbx/records/{recording_id}/insights")
+                   f"/accounts/{account_id}/domains/pbx/records/{recording_id}/insights")
             while True:
                 try:
                     r = requests.get(url, headers={"Authorization": "Bearer " + token}, timeout=30)
@@ -563,13 +563,11 @@ def debug_token():
         return "not logged in"
     import requests
     token = session["rc_token"]
-    recording_id = "3559043026020"
-    results = []
-    for domain in ["pbx", "ucaas", "cc", "ringsense"]:
-        url = f"https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/{domain}/records/{recording_id}/insights"
-        r = requests.get(url, headers={"Authorization": "Bearer " + token})
-        results.append(f"<b>{domain}</b>: {r.status_code} — {r.text[:200]}<br><br>")
-    return "".join(results)
+    # Get token info to see scopes and extension
+    r = requests.get(
+        "https://platform.ringcentral.com/restapi/oauth/tokeninfo",
+        headers={"Authorization": "Bearer " + token})
+    return f"Status: {r.status_code}<br><pre>{r.text[:3000]}</pre>"
 
 @app.route("/debug-ringsense2")
 def debug_ringsense2():
