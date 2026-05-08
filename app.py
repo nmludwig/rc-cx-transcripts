@@ -564,21 +564,28 @@ def debug_token():
     import requests
     token = session["rc_token"]
     results = []
-    # Check extension info
-    r1 = requests.get(
-        "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~",
-        headers={"Authorization": "Bearer " + token})
-    results.append(f"<b>Extension:</b> {r1.status_code}<br><pre>{r1.text[:500]}</pre>")
-    # Try RingSense with a known recording
-    r2 = requests.get(
-        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/~/domains/pbx/records/3559043026020/insights",
-        headers={"Authorization": "Bearer " + token})
-    results.append(f"<b>RingSense pbx:</b> {r2.status_code}<br><pre>{r2.text[:500]}</pre>")
-    # Try with account id
-    r3 = requests.get(
-        "https://platform.ringcentral.com/ai/ringsense/v1/public/accounts/1363409020/domains/pbx/records/3559043026020/insights",
-        headers={"Authorization": "Bearer " + token})
-    results.append(f"<b>RingSense acct:</b> {r3.status_code}<br><pre>{r3.text[:500]}</pre>")
+    # Try to get RingSense session token
+    for url in [
+        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/token",
+        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/login",
+        "https://api.ringsense.ringcentral.com/rest/v1.0/integrations/status",
+    ]:
+        r = requests.get(url, headers={
+            "Authorization": "Bearer " + token,
+            "organizationid": "d0e902ac-6613-455c-9afb-62e57b8574e9"
+        })
+        results.append(f"<b>GET {url.split('v1.0/')[1]}</b>: {r.status_code}<br><pre>{r.text[:300]}</pre><br>")
+    # Try POST to auth
+    r2 = requests.post(
+        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/token",
+        headers={
+            "Authorization": "Bearer " + token,
+            "organizationid": "d0e902ac-6613-455c-9afb-62e57b8574e9",
+            "Content-Type": "application/json"
+        },
+        json={"token": token}
+    )
+    results.append(f"<b>POST auth/token</b>: {r2.status_code}<br><pre>{r2.text[:300]}</pre>")
     return "".join(results)
 
 @app.route("/debug-ringsense2")
