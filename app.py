@@ -198,6 +198,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
 
         total = len(records)
         job_log(job_id, f"Fetching RingSense transcripts for {total} calls…")
+        job_log(job_id, f"This takes about 1.5 seconds per call — estimated {round(total * 1.5 / 60, 1)} minutes. Please be patient…", "warn")
         transcript_records = []
         with_transcripts = 0
 
