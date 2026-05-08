@@ -563,29 +563,17 @@ def debug_token():
         return "not logged in"
     import requests
     token = session["rc_token"]
+    org_id = "d0e902ac-6613-455c-9afb-62e57b8574e9"
     results = []
-    # Try to get RingSense session token
-    for url in [
-        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/token",
-        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/login",
-        "https://api.ringsense.ringcentral.com/rest/v1.0/integrations/status",
+    for url, body in [
+        ("https://api.ringsense.ringcentral.com/rest/v1.0/integrations/rc/token", {"rcAccessToken": token}),
+        ("https://api.ringsense.ringcentral.com/rest/v1.0/auth/rc", {"rcAccessToken": token}),
+        ("https://api.ringsense.ringcentral.com/api-temp/v1/auth/rc-token", {"rcAccessToken": token}),
+        ("https://api.ringsense.ringcentral.com/api-temp/v1/auth/token", {"rcAccessToken": token}),
+        ("https://api.ringsense.ringcentral.com/rest/v1.0/auth/sso", {"token": token}),
     ]:
-        r = requests.get(url, headers={
-            "Authorization": "Bearer " + token,
-            "organizationid": "d0e902ac-6613-455c-9afb-62e57b8574e9"
-        })
-        results.append(f"<b>GET {url.split('v1.0/')[1]}</b>: {r.status_code}<br><pre>{r.text[:300]}</pre><br>")
-    # Try POST to auth
-    r2 = requests.post(
-        "https://api.ringsense.ringcentral.com/rest/v1.0/auth/token",
-        headers={
-            "Authorization": "Bearer " + token,
-            "organizationid": "d0e902ac-6613-455c-9afb-62e57b8574e9",
-            "Content-Type": "application/json"
-        },
-        json={"token": token}
-    )
-    results.append(f"<b>POST auth/token</b>: {r2.status_code}<br><pre>{r2.text[:300]}</pre>")
+        r = requests.post(url, headers={"Authorization": "Bearer " + token, "organizationid": org_id, "Content-Type": "application/json"}, json=body)
+        results.append(f"<b>{url.split('.com/')[1]}</b>: {r.status_code} {r.text[:200]}<br><br>")
     return "".join(results)
 
 @app.route("/debug-ringsense2")
