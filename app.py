@@ -209,7 +209,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
             job["progress"] = 15 + int(70 * (i / max(total, 1)))
             insights = None
             url = ("https://platform.ringcentral.com/ai/ringsense/v1/public"
-                   f"/accounts/{account_id}/domains/pbx/records/{recording_id}/insights")
+                   f"/accounts/~/domains/pbx/records/{recording_id}/insights")
             while True:
                 try:
                     r = requests.get(url, headers={"Authorization": "Bearer " + token}, timeout=30)
