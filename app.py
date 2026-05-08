@@ -178,7 +178,7 @@ def run_download_job(job_id, token, account_id, customer_name, date_from, date_t
                 headers={"Authorization": "Bearer " + token},
                 params={"view": "Detailed", "dateFrom": date_from + "T00:00:00Z",
                         "dateTo": date_to + "T23:59:59Z", "type": "Voice",
-                        "withRecording": "true", "perPage": 250, "page": page},
+                        "perPage": 250, "page": page},
                 timeout=30)
             resp.raise_for_status()
             data = resp.json()
