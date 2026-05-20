@@ -346,14 +346,17 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
             ts_from = int(cursor.timestamp() * 1000)
             ts_to   = int(window_end.timestamp() * 1000)
 
-            url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
+            # The integration API uses the sub-account ID in both positions
+            # URL format: /v1/accounts/{mainAccountId}/sub-accounts/{subAccountId}/interaction-metadata
+            # For accounts where rcAccountId == subAccountId, use it in both positions
+            url = (f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                    f"/sub-accounts/{sub_account_id}/interaction-metadata")
+
+            # Payload uses ISO 8601 strings, not millisecond timestamps
             payload = {
-                "timeInterval": {
-                    "startTime": ts_from,
-                    "endTime":   ts_to,
-                },
-                "pageSize": 200,
+                "startDate": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "endDate":   window_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "pageSize":  200,
             }
 
             page_token = None
@@ -375,7 +378,9 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
                     break
 
                 if r.status_code != 200:
-                    job_log(job_id, f"Metadata fetch failed ({r.status_code}): {r.text[:200]}", "warn")
+                    job_log(job_id, f"Metadata fetch failed ({r.status_code}): {r.text[:300]}", "warn")
+                    job_log(job_id, f"URL: {url}", "warn")
+                    job_log(job_id, f"Payload: {payload}", "warn")
                     break
 
                 body     = r.json()
@@ -421,7 +426,7 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
             transcript_url = (
-                f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
+                f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                 f"/sub-accounts/{sub_account_id}"
                 f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
