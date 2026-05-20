@@ -324,9 +324,9 @@ def _cx_headers(token: str) -> dict:
 def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh_token,
                         rc_account_id, sub_account_id, customer_name, date_from, date_to):
     job = jobs[job_id]
-    # Integration APIs (metadata + transcripts) use RC token on platform.ringcentral.com
-    token = rc_token
-    refresh_token = rc_refresh_token
+    # Integration APIs use CX token on ringcx.ringcentral.com
+    token = cx_token
+    refresh_token = cx_refresh_token
     try:
         job_log(job_id, f"Starting RingCX download for {customer_name}")
         job_log(job_id, f"RC Account: {rc_account_id}  |  Sub-account: {sub_account_id}")
@@ -362,8 +362,9 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             ts_from = int(cursor.timestamp() * 1000)
             ts_to   = int(window_end.timestamp() * 1000)
 
-            # Integration APIs use platform.ringcentral.com with the RC token
-            url = (f"{PLATFORM_BASE}/cx/integration/v1/accounts/{sub_account_id}"
+            # Integration APIs use ringcx.ringcentral.com with CX token
+            # Path format: /voice/api/v1/admin/accounts/{subAccountId}/... 
+            url = (f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                    f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
             # Payload field names per validation errors:
@@ -388,9 +389,10 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         time.sleep(35)
                         continue
                     if r.status_code == 401:
-                        token, refresh_token = refresh_rc_token(refresh_token)
-                        if token:
-                            job_log(job_id, "Token refreshed.", "ok")
+                        new_tok, refresh_token = _refresh_cx_token(refresh_token)
+                        if new_tok:
+                            token = new_tok
+                            job_log(job_id, "CX token refreshed.", "ok")
                         continue
                     break
 
@@ -443,7 +445,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
             transcript_url = (
-                f"{PLATFORM_BASE}/cx/integration/v1/accounts/{sub_account_id}"
+                f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                 f"/sub-accounts/{sub_account_id}"
                 f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
@@ -522,12 +524,13 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         f"Processed {call_count}/{total} segments "
                         f"({with_transcripts} transcripts so far)")
 
-            # Refresh RC token every 50 calls
-            if call_count % 50 == 0 and refresh_token:
-                new_tok, refresh_token = refresh_rc_token(refresh_token)
+            # Refresh CX token every 20 calls (CX tokens expire in ~5 minutes)
+            if call_count % 20 == 0 and refresh_token:
+                new_tok, new_refresh = _refresh_cx_token(refresh_token)
                 if new_tok:
                     token = new_tok
-                    job_log(job_id, "RC access token refreshed.", "ok")
+                    refresh_token = new_refresh
+                    job_log(job_id, "CX access token refreshed.", "ok")
 
             time.sleep(0.5)
 
