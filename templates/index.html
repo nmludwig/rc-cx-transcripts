@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
+<!-- saved from url=(0051)file:///Users/matthew.ludwig/Downloads/index_4.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>RingCentral ACE — Transcript Downloader</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>RingCentral RingCX — Transcript Downloader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com/">
+<link href="./index_files/css2" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --orange:#FF6A00;--orange-lt:#FFF3E8;--orange-dk:#CC5300;
+  --blue:#0066CC;--blue-lt:#E6F1FB;--blue-dk:#004E99;
   --dark:#111318;--mid:#3A3F4B;--muted:#8A909E;--border:#E2E5ED;
   --bg:#F7F8FA;--white:#FFFFFF;--green:#12B76A;--red:#F04438;
   --radius:10px;--shadow:0 2px 12px rgba(0,0,0,0.08);--shadow-lg:0 8px 32px rgba(0,0,0,0.12)
@@ -19,38 +19,39 @@ html,body{height:100%;font-family:'DM Sans',sans-serif;background:var(--bg);colo
 .topbar{background:var(--dark);padding:0 32px;height:56px;display:flex;align-items:center;gap:12px;flex-shrink:0}
 .topbar-wordmark{font-size:14px;font-weight:600;color:#fff}
 .topbar-sep{color:#444;margin:0 4px}
-.topbar-product{font-size:13px;color:var(--orange)}
+.topbar-product{font-size:13px;color:#5BA3E0}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
 .topbar-user{font-size:13px;color:#aaa}
-.topbar-badge{background:var(--orange);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;letter-spacing:0.04em;text-transform:uppercase}
+.topbar-badge{background:var(--blue);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;letter-spacing:0.04em;text-transform:uppercase}
 .topbar-logout{font-size:12px;color:#888;text-decoration:none;padding:4px 10px;border:1px solid #333;border-radius:6px;transition:all 0.15s}
 .topbar-logout:hover{color:#fff;border-color:#666}
 .main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px 60px}
-.card{background:var(--white);border-radius:16px;box-shadow:var(--shadow-lg);width:100%;max-width:620px;overflow:hidden}
-.card-hero{background:linear-gradient(135deg,var(--orange) 0%,#FF8C3A 100%);padding:28px 32px 24px;position:relative;overflow:hidden}
+.card{background:var(--white);border-radius:16px;box-shadow:var(--shadow-lg);width:100%;max-width:640px;overflow:hidden}
+.card-hero{background:linear-gradient(135deg,var(--blue) 0%,#3D8FD6 100%);padding:28px 32px 24px;position:relative;overflow:hidden}
 .card-hero::after{content:'';position:absolute;right:-30px;top:-30px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,0.07)}
 .hero-eyebrow{font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.7);margin-bottom:6px}
 .hero-title{font-size:22px;font-weight:600;color:#fff;line-height:1.25}
 .hero-sub{font-size:13px;color:rgba(255,255,255,0.75);margin-top:6px}
 .card-body{padding:28px 32px 32px}
 .step{display:none}.step.active{display:block}
-.step-label{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--orange);margin-bottom:4px}
+.step-label{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:4px}
 .step-title{font-size:18px;font-weight:600;color:var(--dark);margin-bottom:16px}
 .steps-nav{display:flex;gap:6px;padding:16px 32px 0;background:var(--white)}
 .step-dot{flex:1;height:3px;border-radius:2px;background:var(--border);transition:background 0.3s}
-.step-dot.done{background:var(--orange)}.step-dot.active{background:var(--orange);opacity:0.5}
+.step-dot.done{background:var(--blue)}.step-dot.active{background:var(--blue);opacity:0.5}
 .form-group{margin-bottom:18px}
 label{display:block;font-size:13px;font-weight:500;color:var(--mid);margin-bottom:6px}
-input[type=text],input[type=date]{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:14px;color:var(--dark);background:var(--white);transition:border-color 0.2s,box-shadow 0.2s;outline:none}
-input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
+input[type=text],input[type=date],select{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:14px;color:var(--dark);background:var(--white);transition:border-color 0.2s,box-shadow 0.2s;outline:none;appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238A909E' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px}
+input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,102,204,0.1)}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .date-presets{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .preset-btn{padding:6px 14px;border-radius:99px;border:1.5px solid var(--border);background:var(--white);font-family:inherit;font-size:13px;font-weight:500;color:var(--mid);cursor:pointer;transition:all 0.15s}
-.preset-btn:hover{border-color:var(--orange);color:var(--orange)}
-.preset-btn.active{background:var(--orange);border-color:var(--orange);color:#fff}
+.preset-btn:hover{border-color:var(--blue);color:var(--blue)}
+.preset-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 24px;border-radius:var(--radius);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none}
-.btn-primary{background:var(--orange);color:#fff;width:100%}
-.btn-primary:hover{background:var(--orange-dk)}
+.btn-primary{background:var(--blue);color:#fff;width:100%}
+.btn-primary:hover{background:var(--blue-dk)}
 .btn-primary:active{transform:scale(0.98)}
 .btn-primary:disabled{opacity:0.55;cursor:not-allowed;transform:none}
 .btn-ghost{background:var(--bg);color:var(--mid);border:1.5px solid var(--border)}
@@ -60,22 +61,23 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
 
 /* Login page */
 .login-wrap{text-align:center;padding:20px 0 8px}
-.login-icon{width:64px;height:64px;background:var(--orange-lt);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px}
+.login-icon{width:64px;height:64px;background:var(--blue-lt);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px}
 .login-title{font-size:20px;font-weight:600;color:var(--dark);margin-bottom:8px}
 .login-sub{font-size:14px;color:var(--muted);margin-bottom:28px;line-height:1.6}
-.login-btn{display:inline-flex;align-items:center;gap:10px;background:var(--orange);color:#fff;padding:13px 28px;border-radius:var(--radius);font-size:15px;font-weight:600;text-decoration:none;transition:all 0.15s;border:none;cursor:pointer;font-family:inherit}
-.login-btn:hover{background:var(--orange-dk);transform:translateY(-1px);box-shadow:0 4px 16px rgba(255,106,0,0.3)}
+.login-btn{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;padding:13px 28px;border-radius:var(--radius);font-size:15px;font-weight:600;text-decoration:none;transition:all 0.15s;border:none;cursor:pointer;font-family:inherit}
+.login-btn:hover{background:var(--blue-dk);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,102,204,0.3)}
 .login-note{font-size:12px;color:var(--muted);margin-top:16px}
 
 .alert{padding:11px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:none}
 .alert.visible{display:flex;align-items:flex-start;gap:8px}
 .alert-error{background:#FEF3F2;color:#B42318;border:1px solid #FDA29B}
 .alert-warn{background:#FFFAEB;color:#B54708;border:1px solid #FEC84B}
+.alert-info{background:var(--blue-lt);color:var(--blue-dk);border:1px solid #BFDBFE}
 
 .progress-wrap{margin-bottom:20px}
 .progress-header{display:flex;justify-content:space-between;font-size:13px;font-weight:500;color:var(--mid);margin-bottom:8px}
 .progress-bar-bg{height:6px;background:var(--border);border-radius:99px;overflow:hidden}
-.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--orange),#FF8C3A);border-radius:99px;transition:width 0.5s ease;width:0%}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),#3D8FD6);border-radius:99px;transition:width 0.5s ease;width:0%}
 .log-console{background:#0F1117;border-radius:var(--radius);padding:14px;height:220px;overflow-y:auto;font-family:'DM Mono',monospace;font-size:12px;line-height:1.7;margin-bottom:20px}
 .log-line{display:flex;gap:10px}
 .log-ts{color:#4A5264;flex-shrink:0}
@@ -87,7 +89,7 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
 .stat-label{font-size:12px;color:var(--muted);margin-top:4px}
 .download-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
 .dl-btn{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:var(--radius);border:1.5px solid var(--border);background:var(--white);cursor:pointer;text-decoration:none;transition:all 0.15s;font-family:inherit}
-.dl-btn:hover{border-color:var(--orange);box-shadow:var(--shadow)}
+.dl-btn:hover{border-color:var(--blue);box-shadow:var(--shadow)}
 .dl-btn-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .dl-btn-icon.xlsx{background:#E8F5E9}.dl-btn-icon.pdf{background:#FEF3F2}
 .dl-btn-text strong{display:block;font-size:14px;font-weight:600;color:var(--dark)}
@@ -96,27 +98,30 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
 .spinner.visible{display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-.welcome-box{background:var(--orange-lt);border:1px solid rgba(255,106,0,0.2);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--mid);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.welcome-box{background:var(--blue-lt);border:1px solid rgba(0,102,204,0.2);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--mid);margin-bottom:20px;display:flex;align-items:center;gap:10px}
 .welcome-box strong{color:var(--dark)}
+
+.subacct-loading{font-size:13px;color:var(--muted);padding:10px 0;display:none}
+.subacct-loading.visible{display:block}
 </style>
 </head>
 <body>
 <div class="app-shell">
 <header class="topbar">
   <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-    <circle cx="14" cy="14" r="14" fill="#FF6A00"/>
-    <path d="M8 14a6 6 0 1 1 12 0A6 6 0 0 1 8 14Z" fill="white" fill-opacity=".2"/>
-    <circle cx="14" cy="14" r="3.5" fill="white"/>
+    <circle cx="14" cy="14" r="14" fill="#0066CC"></circle>
+    <path d="M8 14a6 6 0 1 1 12 0A6 6 0 0 1 8 14Z" fill="white" fill-opacity=".2"></path>
+    <circle cx="14" cy="14" r="3.5" fill="white"></circle>
   </svg>
   <span class="topbar-wordmark">RingCentral</span>
   <span class="topbar-sep">|</span>
-  <span class="topbar-product">ACE Transcript Downloader</span>
+  <span class="topbar-product">RingCX Transcript Downloader</span>
   <div class="topbar-right">
     {% if authed %}
       {% if display_name %}<span class="topbar-user">{{ display_name }}</span>{% endif %}
-      <a href="/logout" class="topbar-logout">Sign out</a>
+      <a href="file:///logout" class="topbar-logout">Sign out</a>
     {% endif %}
-    <span class="topbar-badge">Demo</span>
+    <span class="topbar-badge">Beta</span>
   </div>
 </header>
 
@@ -131,9 +136,9 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
 <main class="main">
 <div class="card">
   <div class="card-hero">
-    <div class="hero-eyebrow">RingCentral ACE</div>
-    <div class="hero-title">Download Call Transcripts</div>
-    <div class="hero-sub">Export all ACE call transcripts for any account to Excel &amp; PDF</div>
+    <div class="hero-eyebrow">RingCentral RingCX</div>
+    <div class="hero-title">Download Contact Center Transcripts</div>
+    <div class="hero-sub">Export all RingCX call transcripts for any account to Excel &amp; PDF</div>
   </div>
   <div class="card-body">
 
@@ -146,10 +151,10 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
       Use your RingCentral admin credentials to connect.<br>
       You'll be taken to the RingCentral login page and redirected back here.
     </div>
-    <a href="/login" class="login-btn">
+    <a href="file:///login" class="login-btn">
       <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
-        <circle cx="14" cy="14" r="14" fill="white" fill-opacity="0.25"/>
-        <circle cx="14" cy="14" r="3.5" fill="white"/>
+        <circle cx="14" cy="14" r="14" fill="white" fill-opacity="0.25"></circle>
+        <circle cx="14" cy="14" r="3.5" fill="white"></circle>
       </svg>
       Login with RingCentral
     </a>
@@ -171,8 +176,18 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
 
     <div id="alertStep0" class="alert alert-error"></div>
 
+    <!-- Sub-account selector -->
     <div class="form-group">
-      <label>Customer / Account Name</label>
+      <label>RingCX Sub-Account</label>
+      <div id="subAcctLoading" class="subacct-loading">Loading sub-accounts…</div>
+      <select id="subAccountId" style="display:none">
+        <option value="">— Select a sub-account —</option>
+      </select>
+      <div id="subAcctError" class="alert alert-warn visible" style="margin-top:8px;margin-bottom:0">Could not load sub-accounts. Check that your RingCentral app has ReadAccounts scope.</div>
+    </div>
+
+    <div class="form-group">
+      <label>Customer / Account Name <span style="color:var(--muted);font-weight:400">(used in file names)</span></label>
       <input type="text" id="customerName" placeholder="Acme Corporation">
     </div>
 
@@ -194,6 +209,10 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
           <input type="date" id="dateTo">
         </div>
       </div>
+    </div>
+
+    <div id="alertInfo" class="alert alert-info visible" style="margin-bottom:18px">
+      ℹ️ &nbsp;Transcripts are available ~5 minutes after a call ends. Only queues with <strong>AI Summaries enabled</strong> in RingCX Admin will have transcript content.
     </div>
 
     <button class="btn btn-primary" id="btnStart" onclick="doStartJob()">
@@ -227,17 +246,17 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
     <div class="step-title">Download Files</div>
 
     <div class="summary-grid">
-      <div class="stat-card"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Calls</div></div>
+      <div class="stat-card"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Interactions</div></div>
       <div class="stat-card"><div class="stat-num" id="statTranscripts">—</div><div class="stat-label">Transcripts</div></div>
       <div class="stat-card"><div class="stat-num" id="statRange">—</div><div class="stat-label">Date Range</div></div>
     </div>
 
     <div class="download-row">
-      <a class="dl-btn" id="dlXlsx" href="#" onclick="return false;">
+      <a class="dl-btn" id="dlXlsx" href="file:///Users/matthew.ludwig/Downloads/index_4.html#" onclick="return false;">
         <div class="dl-btn-icon xlsx">📊</div>
-        <div class="dl-btn-text"><strong>Excel</strong><span>All calls + transcripts</span></div>
+        <div class="dl-btn-text"><strong>Excel</strong><span>All interactions + transcripts</span></div>
       </a>
-      <a class="dl-btn" id="dlPdf" href="#" onclick="return false;">
+      <a class="dl-btn" id="dlPdf" href="file:///Users/matthew.ludwig/Downloads/index_4.html#" onclick="return false;">
         <div class="dl-btn-icon pdf">📄</div>
         <div class="dl-btn-text"><strong>PDF Report</strong><span>Formatted, printable</span></div>
       </a>
@@ -255,6 +274,7 @@ input:focus{border-color:var(--orange);box-shadow:0 0 0 3px rgba(255,106,0,0.1)}
 <script>
 let jobId = null, pollTimer = null, seenLogs = 0;
 
+// ── Navigation ──────────────────────────────────────────────────────────────
 function goStep(n) {
   document.querySelectorAll('.step').forEach((el,i) => el.classList.toggle('active', i===n));
   document.querySelectorAll('.step-dot').forEach((el,i) => {
@@ -262,6 +282,7 @@ function goStep(n) {
   });
 }
 
+// ── Date presets ─────────────────────────────────────────────────────────────
 function setPreset(days, btn) {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -272,6 +293,7 @@ function setPreset(days, btn) {
   document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
 }
 
+// Default to last 30 days
 (function() {
   const today = new Date(), from = new Date(today);
   from.setDate(from.getDate() - 30);
@@ -280,65 +302,135 @@ function setPreset(days, btn) {
   if (dt) dt.value = today.toISOString().split('T')[0];
 })();
 
-async function doStartJob() {
-  const btn  = document.getElementById('btnStart');
-  const spin = document.getElementById('spinStart');
-  const txt  = document.getElementById('btnStartText');
-  const customer = document.getElementById('customerName').value.trim() || 'Customer';
-  const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo   = document.getElementById('dateTo').value;
+// ── Sub-account loader ────────────────────────────────────────────────────────
+async function loadSubAccounts() {
+  const loading  = document.getElementById('subAcctLoading');
+  const select   = document.getElementById('subAccountId');
+  const errBox   = document.getElementById('subAcctError');
 
+  if (!loading) return; // not logged in
+
+  try {
+    const res  = await fetch('/api/sub-accounts');
+    const data = await res.json();
+
+    loading.classList.remove('visible');
+
+    if (!Array.isArray(data) || data.length === 0) {
+      errBox.className = 'alert alert-warn visible';
+      errBox.textContent = 'No RingCX sub-accounts found on this account. Make sure WEM access is enabled — contact your RingCentral representative.';
+      select.style.display = 'none';
+      return;
+    }
+
+    data.forEach(sa => {
+      const opt = document.createElement('option');
+      opt.value = sa.id;
+      opt.textContent = sa.name ? `${sa.name} (${sa.id})` : sa.id;
+      select.appendChild(opt);
+    });
+
+    // Auto-select if only one
+    if (data.length === 1) select.value = data[0].id;
+
+    select.style.display = 'block';
+
+  } catch(e) {
+    loading.classList.remove('visible');
+    errBox.className = 'alert alert-warn visible';
+    errBox.textContent = 'Could not load sub-accounts. Check that your RingCentral app has ReadAccounts scope.';
+  }
+}
+
+window.addEventListener('DOMContentLoaded', loadSubAccounts);
+
+// ── Start job ─────────────────────────────────────────────────────────────────
+async function doStartJob() {
+  const btn          = document.getElementById('btnStart');
+  const spin         = document.getElementById('spinStart');
+  const txt          = document.getElementById('btnStartText');
+  const al           = document.getElementById('alertStep0');
+  const subAccountId = document.getElementById('subAccountId')?.value || '';
+  const customer     = document.getElementById('customerName').value.trim() || 'Customer';
+  const dateFrom     = document.getElementById('dateFrom').value;
+  const dateTo       = document.getElementById('dateTo').value;
+
+  al.className = 'alert alert-error';
+  al.textContent = '';
+
+  if (!subAccountId) {
+    al.className = 'alert alert-error visible';
+    al.textContent = 'Please select a RingCX sub-account.';
+    return;
+  }
   if (!dateFrom || !dateTo) {
-    const al = document.getElementById('alertStep0');
     al.className = 'alert alert-error visible';
     al.textContent = 'Please select a date range.';
     return;
   }
 
-  btn.disabled = true; spin.classList.add('visible'); txt.textContent = 'Starting…';
+  btn.disabled = true;
+  spin.classList.add('visible');
+  txt.textContent = 'Starting…';
 
   try {
     const res  = await fetch('/api/start-job', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({customer_name: customer, date_from: dateFrom, date_to: dateTo})
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        customer_name:  customer,
+        date_from:      dateFrom,
+        date_to:        dateTo,
+        sub_account_id: subAccountId,
+      })
     });
     const data = await res.json();
     if (!res.ok) {
-      const al = document.getElementById('alertStep0');
       al.className = 'alert alert-error visible';
       al.textContent = data.error || 'Failed to start job.';
       return;
     }
-    jobId = data.job_id; seenLogs = 0;
+    jobId = data.job_id;
+    seenLogs = 0;
     goStep(1);
     pollTimer = setInterval(pollJob, 1500);
   } catch(e) {
-    const al = document.getElementById('alertStep0');
     al.className = 'alert alert-error visible';
-    al.textContent = 'Network error.';
+    al.textContent = 'Network error — could not reach the server.';
   } finally {
-    btn.disabled = false; spin.classList.remove('visible'); txt.textContent = 'Start Download';
+    btn.disabled = false;
+    spin.classList.remove('visible');
+    txt.textContent = 'Start Download';
   }
 }
 
+// ── Poll job status ───────────────────────────────────────────────────────────
 async function pollJob() {
   if (!jobId) return;
   try {
     const res  = await fetch(`/api/job/${jobId}`);
     const data = await res.json();
     const pct  = data.progress || 0;
+
     document.getElementById('progressFill').style.width = pct + '%';
     document.getElementById('progressPct').textContent  = pct + '%';
-    const labels = ['Starting up…','Fetching call log…','Downloading transcripts…','Building files…','Finalizing…'];
+
+    const labels = [
+      'Starting up…',
+      'Fetching interaction metadata…',
+      'Downloading transcripts…',
+      'Building files…',
+      'Finalizing…'
+    ];
     document.getElementById('progressLabel').textContent =
-      pct >= 100 ? 'Complete!' : labels[Math.min(Math.floor(pct/20), labels.length-1)];
+      pct >= 100 ? 'Complete!' : labels[Math.min(Math.floor(pct / 20), labels.length - 1)];
 
     const console_ = document.getElementById('logConsole');
     const logs = data.log || [];
     logs.slice(seenLogs).forEach(line => {
       const row = document.createElement('div'); row.className = 'log-line';
-      const ts  = document.createElement('span'); ts.className = 'log-ts'; ts.textContent = line.t;
-      const msg = document.createElement('span'); msg.className = `log-${line.level||'info'}`; msg.textContent = line.msg;
+      const ts  = document.createElement('span'); ts.className = 'log-ts';   ts.textContent = line.t;
+      const msg = document.createElement('span'); msg.className = `log-${line.level || 'info'}`; msg.textContent = line.msg;
       row.appendChild(ts); row.appendChild(msg); console_.appendChild(row);
     });
     seenLogs = logs.length;
@@ -352,19 +444,21 @@ async function pollJob() {
       document.getElementById('statRange').textContent       = s.date_from && s.date_to
         ? s.date_from.slice(5) + ' – ' + s.date_to.slice(5) : '—';
       const base = `/api/download/${jobId}/`;
-      (data.files||[]).forEach(f => {
-        const el = document.getElementById(f==='xlsx'?'dlXlsx':'dlPdf');
-        if (el) { el.href = base+f; el.onclick = null; }
+      (data.files || []).forEach(f => {
+        const el = document.getElementById(f === 'xlsx' ? 'dlXlsx' : 'dlPdf');
+        if (el) { el.href = base + f; el.onclick = null; }
       });
       setTimeout(() => goStep(2), 600);
+
     } else if (data.status === 'error') {
       clearInterval(pollTimer);
       const al = document.getElementById('alertStep1');
       al.className = 'alert alert-error visible';
-      al.textContent = 'Error: ' + (data.error||'Unknown error');
+      al.textContent = 'Error: ' + (data.error || 'Unknown error');
     }
   } catch(e) {}
 }
 </script>
-</body>
-</html>
+
+
+</body></html>
