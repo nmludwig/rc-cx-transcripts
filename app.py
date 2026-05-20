@@ -3,11 +3,19 @@
 RingCentral RingCX Transcript Downloader — Web Server
 Uses the RingCX Integration API (cx/integration/v1) with 3-legged OAuth.
 
+Auth is a TWO-STEP process:
+  Step 1: Standard RingCentral OAuth → RC access token (ReadAccounts scope)
+  Step 2: Exchange RC token for a RingCX-specific token via:
+          POST https://ringcx.ringcentral.com/api/auth/login/rc/accesstoken
+  The RingCX token expires in ~5 minutes and must be refreshed separately.
+  Sub-account ID is extracted from the CX token exchange response (agentDetails.accountId).
+
 Key differences from the RingEX/RingSense version:
   - Call discovery:  POST .../interaction-metadata  (returns dialogId + segmentId)
   - Transcript:      GET  .../transcripts/dialogs/{dialogId}/segments/{segmentId}
   - Auth scope:      ReadAccounts only (platform permissions managed in RingCX Admin)
-  - Sub-account:     Required — discovered automatically from the accounts API
+  - Sub-account:     Extracted from CX token exchange response — no separate lookup needed
+  - User must be:    RingCX admin with WEM access enabled on their user profile
 """
 
 import sys, os, re, time, threading, uuid, secrets
@@ -37,6 +45,10 @@ RC_REDIRECT_URI  = os.environ.get("RC_REDIRECT_URI", "http://localhost:5000/oaut
 RC_AUTH_URL  = "https://platform.ringcentral.com/restapi/oauth/authorize"
 RC_TOKEN_URL = "https://platform.ringcentral.com/restapi/oauth/token"
 
+# RingCX token exchange — Step 2 of auth
+CX_TOKEN_URL         = "https://ringcx.ringcentral.com/api/auth/login/rc/accesstoken"
+CX_TOKEN_REFRESH_URL = "https://ringcx.ringcentral.com/api/auth/token/refresh"
+
 # RingCX integration base
 CX_BASE = "https://ringcx.ringcentral.com/voice/api"
 
@@ -57,7 +69,7 @@ jobs = {}   # in-memory job store
 
 @app.route("/")
 def index():
-    if session.get("rc_token"):
+    if session.get("cx_token"):
         return render_template("index.html", authed=True,
                                display_name=session.get("rc_display_name", ""),
                                sub_accounts=session.get("rc_sub_accounts", []))
@@ -107,29 +119,30 @@ def oauth_callback():
     except Exception as e:
         return render_template("error.html", message=f"Connection error: {e}"), 503
 
-    data  = resp.json()
-    token = data["access_token"]
+    rc_data         = resp.json()
+    rc_token        = rc_data["access_token"]
+    rc_refresh      = rc_data.get("refresh_token", "")
 
-    # Resolve display name and RC account ID
-    display_name = ""
-    rc_account_id = ""
-    try:
-        me = requests.get(
-            "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~",
-            headers={"Authorization": "Bearer " + token}, timeout=15).json()
-        display_name  = me.get("name", "") or me.get("contact", {}).get("firstName", "")
-        rc_account_id = str(me.get("account", {}).get("id", ""))
-    except Exception:
-        pass
+    # ------------------------------------------------------------------
+    # Step 2 — Exchange RC token for a RingCX-specific token
+    # The CX token is what actually authorizes all CX API calls.
+    # It expires in ~5 minutes and carries accountId + agentDetails.
+    # ------------------------------------------------------------------
+    cx_token, cx_refresh, rc_account_id, sub_accounts, display_name = \
+        _exchange_for_cx_token(rc_token)
 
-    # Discover RingCX sub-accounts
-    sub_accounts = _fetch_sub_accounts(token, rc_account_id)
+    if not cx_token:
+        return render_template("error.html",
+            message="Logged in to RingCentral but could not exchange for a RingCX token. "
+                    "Make sure this user is a RingCX admin with WEM access enabled."), 403
 
-    session["rc_token"]         = token
-    session["rc_refresh_token"] = data.get("refresh_token", "")
-    session["rc_token_time"]    = datetime.now().timestamp()
-    session["rc_display_name"]  = display_name
+    session["rc_token"]         = rc_token        # keep for re-exchange if needed
+    session["rc_refresh_token"] = rc_refresh
+    session["cx_token"]         = cx_token        # used for all CX API calls
+    session["cx_refresh_token"] = cx_refresh
+    session["cx_token_time"]    = datetime.now().timestamp()
     session["rc_account_id"]    = rc_account_id
+    session["rc_display_name"]  = display_name
     session["rc_sub_accounts"]  = sub_accounts
     session.pop("oauth_state", None)
     return redirect(url_for("index"))
@@ -142,33 +155,67 @@ def logout():
 
 
 # ---------------------------------------------------------------------------
-# Sub-account discovery
+# CX Token Exchange (Step 2 of auth)
 # ---------------------------------------------------------------------------
 
-def _fetch_sub_accounts(token: str, rc_account_id: str) -> list:
-    """Return a list of {id, name} dicts for all RingCX sub-accounts."""
-    if not rc_account_id:
-        return []
+def _exchange_for_cx_token(rc_token: str):
+    """
+    Exchange a RingCentral OAuth token for a RingCX-specific token.
+    Returns (cx_token, cx_refresh, rc_account_id, sub_accounts, display_name)
+    or (None, None, None, [], "") on failure.
+    """
     try:
-        url = f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}/sub-accounts"
-        r = requests.get(url, headers={"Authorization": "Bearer " + token}, timeout=15)
-        if r.status_code == 200:
-            items = r.json() if isinstance(r.json(), list) else r.json().get("subAccounts", [])
-            return [{"id": str(s.get("id", s.get("subAccountId", ""))),
-                     "name": s.get("name", s.get("accountName", ""))} for s in items]
+        resp = requests.post(
+            CX_TOKEN_URL + "?includeRefresh=true",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={"rcAccessToken": rc_token, "rcTokenType": "Bearer"},
+            timeout=15)
+
+        if resp.status_code != 200:
+            return None, None, None, [], ""
+
+        data = resp.json()
+        cx_token   = data.get("accessToken", "")
+        cx_refresh = data.get("refreshToken", "")
+
+        # Pull sub-accounts and display name from agentDetails
+        agent_details = data.get("agentDetails", [])
+        sub_accounts  = []
+        display_name  = ""
+        rc_account_id = ""
+
+        for agent in agent_details:
+            acct_id   = str(agent.get("accountId", ""))
+            acct_name = agent.get("accountName", "")
+            first     = agent.get("firstName", "")
+            last      = agent.get("lastName", "")
+            if not display_name and (first or last):
+                display_name = f"{first} {last}".strip()
+            if acct_id and not any(s["id"] == acct_id for s in sub_accounts):
+                sub_accounts.append({"id": acct_id, "name": acct_name})
+            if not rc_account_id and acct_id:
+                rc_account_id = acct_id
+
+        return cx_token, cx_refresh, rc_account_id, sub_accounts, display_name
+
+    except Exception as e:
+        return None, None, None, [], ""
+
+
+def _refresh_cx_token(cx_refresh: str):
+    """Refresh an expired RingCX token. Returns (new_cx_token, new_cx_refresh)."""
+    try:
+        resp = requests.post(
+            CX_TOKEN_REFRESH_URL,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data={"refresh_token": cx_refresh, "rcTokenType": "Bearer"},
+            timeout=15)
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get("accessToken", ""), data.get("refreshToken", cx_refresh)
     except Exception:
         pass
-    # Fallback: try legacy engage endpoint
-    try:
-        url2 = f"https://engage.ringcentral.com/voice/api/v1/admin/accounts"
-        r2 = requests.get(url2, headers={"Authorization": "Bearer " + token}, timeout=15)
-        if r2.status_code == 200:
-            accts = r2.json() if isinstance(r2.json(), list) else []
-            return [{"id": str(a.get("rcAccountId", a.get("id", ""))),
-                     "name": a.get("accountName", a.get("name", ""))} for a in accts]
-    except Exception:
-        pass
-    return []
+    return None, cx_refresh
 
 
 # ---------------------------------------------------------------------------
@@ -177,14 +224,14 @@ def _fetch_sub_accounts(token: str, rc_account_id: str) -> list:
 
 @app.route("/api/sub-accounts")
 def api_sub_accounts():
-    if not session.get("rc_token"):
+    if not session.get("cx_token"):
         return jsonify({"error": "Not authenticated."}), 401
     return jsonify(session.get("rc_sub_accounts", []))
 
 
 @app.route("/api/start-job", methods=["POST"])
 def api_start_job():
-    if not session.get("rc_token"):
+    if not session.get("cx_token"):
         return jsonify({"error": "Not authenticated."}), 401
 
     data          = request.json or {}
@@ -205,8 +252,8 @@ def api_start_job():
     threading.Thread(
         target=run_cx_download_job,
         args=(job_id,
-              session["rc_token"],
-              session["rc_refresh_token"],
+              session["cx_token"],         # CX token — not RC token
+              session["cx_refresh_token"],
               session["rc_account_id"],
               sub_account_id,
               customer_name,
@@ -247,19 +294,10 @@ def job_log(job_id, msg, level="info"):
                                 "msg": msg, "level": level})
 
 
-def refresh_rc_token(refresh_token: str):
-    try:
-        resp = requests.post(
-            RC_TOKEN_URL,
-            auth=(RC_CLIENT_ID, RC_CLIENT_SECRET),
-            data={"grant_type": "refresh_token", "refresh_token": refresh_token},
-            timeout=15)
-        if resp.status_code == 200:
-            d = resp.json()
-            return d.get("access_token"), d.get("refresh_token", refresh_token)
-    except Exception:
-        pass
-    return None, refresh_token
+def refresh_rc_token(cx_refresh: str):
+    """Refresh an expired RingCX token inside a running job."""
+    new_tok, new_refresh = _refresh_cx_token(cx_refresh)
+    return new_tok, new_refresh
 
 
 def _cx_headers(token: str) -> dict:
@@ -291,6 +329,13 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
 
         start_dt = parse_dt(date_from)
         end_dt   = parse_dt(date_to).replace(hour=23, minute=59, second=59)
+
+        # API requires data to be at least 15 minutes old to avoid processing errors
+        safe_ceiling = datetime.now(timezone.utc) - timedelta(minutes=15)
+        if end_dt > safe_ceiling:
+            end_dt = safe_ceiling
+            job_log(job_id, "End date capped to 15 min ago (API processing window).", "warn")
+
         window   = timedelta(hours=1)   # API max is 3600 s
 
         all_segments = []   # list of {dialogId, segmentId, metadata…}
@@ -455,12 +500,12 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
                         f"Processed {call_count}/{total} segments "
                         f"({with_transcripts} transcripts so far)")
 
-            # Refresh token every 50 calls
-            if call_count % 50 == 0 and refresh_token:
+            # Refresh CX token every 20 calls (CX tokens expire in ~5 minutes)
+            if call_count % 20 == 0 and refresh_token:
                 new_tok, refresh_token = refresh_rc_token(refresh_token)
                 if new_tok:
                     token = new_tok
-                    job_log(job_id, "Access token refreshed.", "ok")
+                    job_log(job_id, "CX access token refreshed.", "ok")
 
             time.sleep(0.5)
 
