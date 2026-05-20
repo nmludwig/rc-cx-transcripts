@@ -1,22 +1,34 @@
-# RingCentral ACE Transcript Downloader
+# RingCentral RingCX Transcript Downloader
 
-A web app that lets any RingCentral admin log in and export all their ACE call transcripts to Excel and PDF with one click.
+A web app that lets any RingCX admin log in and export all their contact-center call transcripts to Excel and PDF with one click.
 
-**Live demo:** https://rc-transcripts.onrender.com
+Forked from [nmludwig/rc-transcripts](https://github.com/nmludwig/rc-transcripts) (RingEX/RingSense version).
 
 ---
 
 ## What It Does
 
 1. Admin visits the URL and clicks **Login with RingCentral**
-2. They authenticate with their RingCentral admin credentials (handled directly by RingCentral — no credentials are stored)
-3. They enter a customer/account name and pick a date range (7, 30, 90 days or custom)
-4. The app pulls every recorded call from the call log, fetches the ACE AI transcript, summary, and sentiment for each one, and shows a live progress log
+2. They authenticate with their RingCentral admin credentials (handled directly by RingCentral — no credentials stored)
+3. They select a **RingCX sub-account**, enter a customer/account name, and pick a date range
+4. The app queries the **RingCX Integration API** to fetch interaction metadata, then pulls each transcript
 5. When complete, the admin downloads:
-   - **Excel spreadsheet** — Summary tab, All Calls tab, Transcripts tab
-   - **PDF report** — formatted call-by-call transcripts with speaker labels, sentiment badges, and AI summaries
+   - **Excel spreadsheet** — Summary tab, All Interactions tab, Transcripts tab
+   - **PDF report** — formatted interaction-by-interaction transcripts with speaker labels
 
-Downloads take about 1.5 seconds per call due to RingCentral API rate limits.
+Downloads take about 0.5 seconds per interaction segment.
+
+---
+
+## How It Differs from the RingEX Version
+
+| | RingEX version | This (RingCX) version |
+|---|---|---|
+| Call discovery | `platform.ringcentral.com` call log | `ringcx.ringcentral.com` interaction-metadata API |
+| Transcript source | RingSense AI insights API | RingCX transcript API |
+| Auth scope needed | RingSense, ReadCallLog, etc. | `ReadAccounts` only |
+| Sub-account | Not required | Required — auto-discovered |
+| AI requirement | RingSense license per user | "Enable AI Summaries" per queue in RingCX Admin |
 
 ---
 
@@ -27,9 +39,9 @@ Downloads take about 1.5 seconds per call due to RingCentral API rate limits.
 ├── requirements.txt    ← Python dependencies
 ├── README.md           ← This file
 ├── templates/
-│   ├── index.html      ← Single-page UI (3-step wizard)
+│   ├── index.html      ← Single-page UI
 │   └── error.html      ← OAuth error page
-└── outputs/            ← Generated files saved here (auto-created)
+└── outputs/            ← Generated files (auto-created)
 ```
 
 ---
@@ -66,23 +78,58 @@ Open **http://localhost:5000**
 ## RingCentral App Setup (developers.ringcentral.com)
 
 Your RingCentral app needs:
+
 - **Auth type:** 3-legged OAuth — Server-side web app
 - **OAuth Redirect URI:** `https://your-app.onrender.com/oauth/callback`
-- **Scopes:** Analytics, Read Accounts, Read Call Log, Read Call Recording, Read Contacts, RingSense
+- **Scopes:** `ReadAccounts`
+
+> **Note:** Unlike the RingEX version, `ReadAccounts` is the only OAuth scope that has any effect on RingCX APIs. All other permissions are managed in the **RingCX Admin portal**, not in the developer console.
 
 ---
 
-## Auth Flow
+## RingCX Admin Prerequisites
 
-- Users authenticate via **RingCentral OAuth** (Authorization Code flow)
-- The server stores the access token and refresh token in a server-side session — never exposed to the browser
-- Tokens are automatically refreshed every 50 calls during long downloads to prevent expiry on large accounts
-- Credentials are never saved to disk
+Before transcripts will appear, you must enable AI transcription per queue:
+
+1. Log in to **RingCX Admin**
+2. Go to **Routing → Voice/Digital Queues & Skills**
+3. Select your target queue → **AI Tools** section
+4. Check **"Enable AI Summaries"**
+
+You may also need your RingCentral representative to enable:
+- **WEM (Workforce Engagement Management) access** on the account — required to call the integration/metadata API
+- **Recording** — must be manually activated per account
+
+---
+
+## API Flow
+
+```
+OAuth login
+    ↓
+Discover sub-accounts  →  /cx/integration/v1/accounts/{rcAccountId}/sub-accounts
+    ↓
+Poll interaction metadata (1-hour windows)
+    POST /cx/integration/v1/accounts/{rcAccountId}/sub-accounts/{subAccountId}/interaction-metadata
+    ↓
+Fetch transcript per segment
+    GET /cx/integration/v1/accounts/{rcAccountId}/sub-accounts/{subAccountId}/transcripts/dialogs/{dialogId}/segments/{segmentId}
+    ↓
+Build Excel + PDF
+```
+
+---
+
+## Rate Limits
+
+- Interaction metadata endpoint: **2 calls/minute** — the app uses 1-hour time windows with a 600ms delay
+- Transcript endpoint: **120 requests/minute** — the app uses a 500ms delay per segment
+- Tokens are automatically refreshed every 50 calls
 
 ---
 
 ## Notes
 
-- Only calls with ACE/RingSense licenses assigned will have transcripts — calls without licenses show "No transcript available"
-- The RingSense public API must be enabled for the account by RingCentral support
-- Output files are served via `/api/download/<job_id>/<type>` and exist for the duration of the server session
+- Only interactions where AI transcription is enabled on the queue will have transcript content
+- Transcripts are available approximately **5 minutes** after a segment ends
+- Output files are served via `/api/download/<job_id>/<type>` for the duration of the server session
