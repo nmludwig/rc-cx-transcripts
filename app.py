@@ -45,12 +45,13 @@ RC_REDIRECT_URI  = os.environ.get("RC_REDIRECT_URI", "http://localhost:5000/oaut
 RC_AUTH_URL  = "https://platform.ringcentral.com/restapi/oauth/authorize"
 RC_TOKEN_URL = "https://platform.ringcentral.com/restapi/oauth/token"
 
-# RingCX token exchange — Step 2 of auth
+# RingCX token exchange — Step 2 of auth (for CX admin APIs)
 CX_TOKEN_URL         = "https://ringcx.ringcentral.com/api/auth/login/rc/accesstoken"
 CX_TOKEN_REFRESH_URL = "https://ringcx.ringcentral.com/api/auth/token/refresh"
 
-# RingCX integration base
-CX_BASE = "https://ringcx.ringcentral.com/voice/api"
+# RingCX integration base — uses platform.ringcentral.com per RC docs
+CX_BASE     = "https://ringcx.ringcentral.com/voice/api"
+PLATFORM_BASE = "https://platform.ringcentral.com"
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "rc-cx-demo-secret-change-in-prod")
@@ -252,7 +253,9 @@ def api_start_job():
     threading.Thread(
         target=run_cx_download_job,
         args=(job_id,
-              session["cx_token"],         # CX token — not RC token
+              session["rc_token"],          # RC token — for platform.ringcentral.com integration APIs
+              session["rc_refresh_token"],  # RC refresh token
+              session["cx_token"],          # CX token — for ringcx.ringcentral.com admin APIs
               session["cx_refresh_token"],
               session["rc_account_id"],
               sub_account_id,
@@ -294,10 +297,20 @@ def job_log(job_id, msg, level="info"):
                                 "msg": msg, "level": level})
 
 
-def refresh_rc_token(cx_refresh: str):
-    """Refresh an expired RingCX token inside a running job."""
-    new_tok, new_refresh = _refresh_cx_token(cx_refresh)
-    return new_tok, new_refresh
+def refresh_rc_token(rc_refresh: str):
+    """Refresh an expired RC token inside a running job."""
+    try:
+        resp = requests.post(
+            RC_TOKEN_URL,
+            auth=(RC_CLIENT_ID, RC_CLIENT_SECRET),
+            data={"grant_type": "refresh_token", "refresh_token": rc_refresh},
+            timeout=15)
+        if resp.status_code == 200:
+            d = resp.json()
+            return d.get("access_token"), d.get("refresh_token", rc_refresh)
+    except Exception:
+        pass
+    return None, rc_refresh
 
 
 def _cx_headers(token: str) -> dict:
@@ -308,9 +321,12 @@ def _cx_headers(token: str) -> dict:
 # Core download job
 # ---------------------------------------------------------------------------
 
-def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
-                        sub_account_id, customer_name, date_from, date_to):
+def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh_token,
+                        rc_account_id, sub_account_id, customer_name, date_from, date_to):
     job = jobs[job_id]
+    # Integration APIs (metadata + transcripts) use RC token on platform.ringcentral.com
+    token = rc_token
+    refresh_token = rc_refresh_token
     try:
         job_log(job_id, f"Starting RingCX download for {customer_name}")
         job_log(job_id, f"RC Account: {rc_account_id}  |  Sub-account: {sub_account_id}")
@@ -346,10 +362,8 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
             ts_from = int(cursor.timestamp() * 1000)
             ts_to   = int(window_end.timestamp() * 1000)
 
-            # The integration API uses the sub-account ID in both positions
-            # URL format: /v1/accounts/{mainAccountId}/sub-accounts/{subAccountId}/interaction-metadata
-            # For accounts where rcAccountId == subAccountId, use it in both positions
-            url = (f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
+            # Integration APIs use platform.ringcentral.com with the RC token
+            url = (f"{PLATFORM_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                    f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
             # Payload field names per validation errors:
@@ -429,7 +443,7 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
             transcript_url = (
-                f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
+                f"{PLATFORM_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                 f"/sub-accounts/{sub_account_id}"
                 f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
@@ -508,12 +522,12 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
                         f"Processed {call_count}/{total} segments "
                         f"({with_transcripts} transcripts so far)")
 
-            # Refresh CX token every 20 calls (CX tokens expire in ~5 minutes)
-            if call_count % 20 == 0 and refresh_token:
+            # Refresh RC token every 50 calls
+            if call_count % 50 == 0 and refresh_token:
                 new_tok, refresh_token = refresh_rc_token(refresh_token)
                 if new_tok:
                     token = new_tok
-                    job_log(job_id, "CX access token refreshed.", "ok")
+                    job_log(job_id, "RC access token refreshed.", "ok")
 
             time.sleep(0.5)
 
