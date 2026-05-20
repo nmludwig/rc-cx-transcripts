@@ -413,11 +413,21 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     job_log(job_id, f"Payload: {payload}", "warn")
                     break
 
-                body     = r.json()
-                segments = body.get("segments", body.get("records", []))
-                all_segments.extend(segments)
+                body = r.json()
+                # Log first response to understand field names
+                if not all_segments:
+                    job_log(job_id, f"First response sample: {str(body)[:400]}", "info")
+                # API may return a list directly or a dict with segments/records key
+                if isinstance(body, list):
+                    segments = body
+                    page_token = None
+                else:
+                    segments = body.get("segments", body.get("records", body.get("interactions", [])))
+                    page_token = body.get("nextPageToken") or body.get("paging", {}).get("nextPageToken")
 
-                page_token = body.get("nextPageToken") or body.get("paging", {}).get("nextPageToken")
+                all_segments.extend(segments)
+                job_log(job_id, f"Window returned {len(segments)} segments", "ok")
+
                 if not page_token:
                     break
 
