@@ -352,11 +352,14 @@ def run_cx_download_job(job_id, token, refresh_token, rc_account_id,
             url = (f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
                    f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
-            # Payload uses ISO 8601 strings, not millisecond timestamps
+            # Payload field names per validation errors:
+            # timeInterval.segmentStartDate and timeInterval.segmentEndDate
             payload = {
-                "startDate": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "endDate":   window_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "pageSize":  200,
+                "timeInterval": {
+                    "segmentStartDate": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "segmentEndDate":   window_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                },
+                "pageSize": 200,
             }
 
             page_token = None
