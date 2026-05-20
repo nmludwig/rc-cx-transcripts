@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<!-- saved from url=(0051)file:///Users/matthew.ludwig/Downloads/index_4.html -->
-<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
+<html lang="en">
+<head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RingCentral RingCX — Transcript Downloader</title>
-<link rel="preconnect" href="https://fonts.googleapis.com/">
-<link href="./index_files/css2" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -56,10 +56,6 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 .btn-primary:disabled{opacity:0.55;cursor:not-allowed;transform:none}
 .btn-ghost{background:var(--bg);color:var(--mid);border:1.5px solid var(--border)}
 .btn-ghost:hover{border-color:var(--muted);color:var(--dark)}
-.btn-row{display:flex;gap:10px;margin-top:24px}
-.btn-row .btn-primary{flex:1}
-
-/* Login page */
 .login-wrap{text-align:center;padding:20px 0 8px}
 .login-icon{width:64px;height:64px;background:var(--blue-lt);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:28px}
 .login-title{font-size:20px;font-weight:600;color:var(--dark);margin-bottom:8px}
@@ -67,13 +63,11 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 .login-btn{display:inline-flex;align-items:center;gap:10px;background:var(--blue);color:#fff;padding:13px 28px;border-radius:var(--radius);font-size:15px;font-weight:600;text-decoration:none;transition:all 0.15s;border:none;cursor:pointer;font-family:inherit}
 .login-btn:hover{background:var(--blue-dk);transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,102,204,0.3)}
 .login-note{font-size:12px;color:var(--muted);margin-top:16px}
-
 .alert{padding:11px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:16px;display:none}
 .alert.visible{display:flex;align-items:flex-start;gap:8px}
 .alert-error{background:#FEF3F2;color:#B42318;border:1px solid #FDA29B}
 .alert-warn{background:#FFFAEB;color:#B54708;border:1px solid #FEC84B}
 .alert-info{background:var(--blue-lt);color:var(--blue-dk);border:1px solid #BFDBFE}
-
 .progress-wrap{margin-bottom:20px}
 .progress-header{display:flex;justify-content:space-between;font-size:13px;font-weight:500;color:var(--mid);margin-bottom:8px}
 .progress-bar-bg{height:6px;background:var(--border);border-radius:99px;overflow:hidden}
@@ -82,7 +76,6 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 .log-line{display:flex;gap:10px}
 .log-ts{color:#4A5264;flex-shrink:0}
 .log-ok{color:#12B76A}.log-warn{color:#F79009}.log-error{color:#F04438}.log-info{color:#98A0B3}
-
 .summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
 .stat-card{background:var(--bg);border-radius:var(--radius);padding:14px 16px;text-align:center}
 .stat-num{font-size:28px;font-weight:600;color:var(--dark);line-height:1}
@@ -97,10 +90,8 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 .spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;display:none}
 .spinner.visible{display:inline-block}
 @keyframes spin{to{transform:rotate(360deg)}}
-
 .welcome-box{background:var(--blue-lt);border:1px solid rgba(0,102,204,0.2);border-radius:var(--radius);padding:12px 16px;font-size:13px;color:var(--mid);margin-bottom:20px;display:flex;align-items:center;gap:10px}
 .welcome-box strong{color:var(--dark)}
-
 .subacct-loading{font-size:13px;color:var(--muted);padding:10px 0;display:none}
 .subacct-loading.visible{display:block}
 </style>
@@ -109,9 +100,9 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 <div class="app-shell">
 <header class="topbar">
   <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-    <circle cx="14" cy="14" r="14" fill="#0066CC"></circle>
-    <path d="M8 14a6 6 0 1 1 12 0A6 6 0 0 1 8 14Z" fill="white" fill-opacity=".2"></path>
-    <circle cx="14" cy="14" r="3.5" fill="white"></circle>
+    <circle cx="14" cy="14" r="14" fill="#0066CC"/>
+    <path d="M8 14a6 6 0 1 1 12 0A6 6 0 0 1 8 14Z" fill="white" fill-opacity=".2"/>
+    <circle cx="14" cy="14" r="3.5" fill="white"/>
   </svg>
   <span class="topbar-wordmark">RingCentral</span>
   <span class="topbar-sep">|</span>
@@ -119,7 +110,7 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
   <div class="topbar-right">
     {% if authed %}
       {% if display_name %}<span class="topbar-user">{{ display_name }}</span>{% endif %}
-      <a href="file:///logout" class="topbar-logout">Sign out</a>
+      <a href="/logout" class="topbar-logout">Sign out</a>
     {% endif %}
     <span class="topbar-badge">Beta</span>
   </div>
@@ -143,18 +134,17 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
   <div class="card-body">
 
   {% if not authed %}
-  <!-- LOGIN -->
   <div class="login-wrap">
-    <div class="login-icon">🔐</div>
+    <div class="login-icon">&#128272;</div>
     <div class="login-title">Sign in with RingCentral</div>
     <div class="login-sub">
       Use your RingCentral admin credentials to connect.<br>
       You'll be taken to the RingCentral login page and redirected back here.
     </div>
-    <a href="file:///login" class="login-btn">
+    <a href="/login" class="login-btn">
       <svg width="20" height="20" viewBox="0 0 28 28" fill="none">
-        <circle cx="14" cy="14" r="14" fill="white" fill-opacity="0.25"></circle>
-        <circle cx="14" cy="14" r="3.5" fill="white"></circle>
+        <circle cx="14" cy="14" r="14" fill="white" fill-opacity="0.25"/>
+        <circle cx="14" cy="14" r="3.5" fill="white"/>
       </svg>
       Login with RingCentral
     </a>
@@ -162,35 +152,28 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
   </div>
 
   {% else %}
-  <!-- STEP 0: Configure -->
   <div class="step active" id="step0">
     <div class="step-label">Step 1 of 3</div>
     <div class="step-title">Configure Download</div>
-
     {% if display_name %}
     <div class="welcome-box">
-      <span>👋</span>
+      <span>&#128075;</span>
       <span>Signed in as <strong>{{ display_name }}</strong></span>
     </div>
     {% endif %}
-
     <div id="alertStep0" class="alert alert-error"></div>
-
-    <!-- Sub-account selector -->
     <div class="form-group">
       <label>RingCX Sub-Account</label>
-      <div id="subAcctLoading" class="subacct-loading">Loading sub-accounts…</div>
+      <div id="subAcctLoading" class="subacct-loading visible">Loading sub-accounts...</div>
       <select id="subAccountId" style="display:none">
         <option value="">— Select a sub-account —</option>
       </select>
-      <div id="subAcctError" class="alert alert-warn visible" style="margin-top:8px;margin-bottom:0">Could not load sub-accounts. Check that your RingCentral app has ReadAccounts scope.</div>
+      <div id="subAcctError" class="alert alert-warn" style="margin-top:8px;margin-bottom:0"></div>
     </div>
-
     <div class="form-group">
       <label>Customer / Account Name <span style="color:var(--muted);font-weight:400">(used in file names)</span></label>
       <input type="text" id="customerName" placeholder="Acme Corporation">
     </div>
-
     <div class="form-group">
       <label>Date Range</label>
       <div class="date-presets">
@@ -210,59 +193,50 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
         </div>
       </div>
     </div>
-
-    <div id="alertInfo" class="alert alert-info visible" style="margin-bottom:18px">
-      ℹ️ &nbsp;Transcripts are available ~5 minutes after a call ends. Only queues with <strong>AI Summaries enabled</strong> in RingCX Admin will have transcript content.
+    <div class="alert alert-info visible" style="margin-bottom:18px">
+      Transcripts are available ~5 minutes after a call ends. Only queues with <strong>AI Summaries enabled</strong> in RingCX Admin will have transcript content.
     </div>
-
     <button class="btn btn-primary" id="btnStart" onclick="doStartJob()">
       <div class="spinner" id="spinStart"></div>
       <span id="btnStartText">Start Download</span>
     </button>
   </div>
 
-  <!-- STEP 1: Running -->
   <div class="step" id="step1">
     <div class="step-label">Step 2 of 3</div>
     <div class="step-title">Downloading Transcripts</div>
-
     <div class="progress-wrap">
       <div class="progress-header">
-        <span id="progressLabel">Starting…</span>
+        <span id="progressLabel">Starting...</span>
         <span id="progressPct">0%</span>
       </div>
       <div class="progress-bar-bg">
         <div class="progress-bar-fill" id="progressFill"></div>
       </div>
     </div>
-
     <div class="log-console" id="logConsole"></div>
     <div id="alertStep1" class="alert"></div>
   </div>
 
-  <!-- STEP 2: Done -->
   <div class="step" id="step2">
     <div class="step-label">Step 3 of 3</div>
     <div class="step-title">Download Files</div>
-
     <div class="summary-grid">
       <div class="stat-card"><div class="stat-num" id="statTotal">—</div><div class="stat-label">Total Interactions</div></div>
       <div class="stat-card"><div class="stat-num" id="statTranscripts">—</div><div class="stat-label">Transcripts</div></div>
       <div class="stat-card"><div class="stat-num" id="statRange">—</div><div class="stat-label">Date Range</div></div>
     </div>
-
     <div class="download-row">
-      <a class="dl-btn" id="dlXlsx" href="file:///Users/matthew.ludwig/Downloads/index_4.html#" onclick="return false;">
-        <div class="dl-btn-icon xlsx">📊</div>
+      <a class="dl-btn" id="dlXlsx" href="#" onclick="return false;">
+        <div class="dl-btn-icon xlsx">&#128202;</div>
         <div class="dl-btn-text"><strong>Excel</strong><span>All interactions + transcripts</span></div>
       </a>
-      <a class="dl-btn" id="dlPdf" href="file:///Users/matthew.ludwig/Downloads/index_4.html#" onclick="return false;">
-        <div class="dl-btn-icon pdf">📄</div>
+      <a class="dl-btn" id="dlPdf" href="#" onclick="return false;">
+        <div class="dl-btn-icon pdf">&#128196;</div>
         <div class="dl-btn-text"><strong>PDF Report</strong><span>Formatted, printable</span></div>
       </a>
     </div>
-
-    <button class="btn btn-ghost" style="width:100%" onclick="goStep(0)">↩ Run Again</button>
+    <button class="btn btn-ghost" style="width:100%" onclick="goStep(0)">&#8617; Run Again</button>
   </div>
   {% endif %}
 
@@ -274,7 +248,6 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 <script>
 let jobId = null, pollTimer = null, seenLogs = 0;
 
-// ── Navigation ──────────────────────────────────────────────────────────────
 function goStep(n) {
   document.querySelectorAll('.step').forEach((el,i) => el.classList.toggle('active', i===n));
   document.querySelectorAll('.step-dot').forEach((el,i) => {
@@ -282,7 +255,6 @@ function goStep(n) {
   });
 }
 
-// ── Date presets ─────────────────────────────────────────────────────────────
 function setPreset(days, btn) {
   document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -293,7 +265,6 @@ function setPreset(days, btn) {
   document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
 }
 
-// Default to last 30 days
 (function() {
   const today = new Date(), from = new Date(today);
   from.setDate(from.getDate() - 30);
@@ -302,49 +273,36 @@ function setPreset(days, btn) {
   if (dt) dt.value = today.toISOString().split('T')[0];
 })();
 
-// ── Sub-account loader ────────────────────────────────────────────────────────
 async function loadSubAccounts() {
-  const loading  = document.getElementById('subAcctLoading');
-  const select   = document.getElementById('subAccountId');
-  const errBox   = document.getElementById('subAcctError');
-
-  if (!loading) return; // not logged in
-
+  const loading = document.getElementById('subAcctLoading');
+  const select  = document.getElementById('subAccountId');
+  const errBox  = document.getElementById('subAcctError');
+  if (!loading) return;
   try {
     const res  = await fetch('/api/sub-accounts');
     const data = await res.json();
-
     loading.classList.remove('visible');
-
     if (!Array.isArray(data) || data.length === 0) {
       errBox.className = 'alert alert-warn visible';
-      errBox.textContent = 'No RingCX sub-accounts found on this account. Make sure WEM access is enabled — contact your RingCentral representative.';
-      select.style.display = 'none';
+      errBox.textContent = 'No RingCX sub-accounts found. Make sure WEM access is enabled — contact your RingCentral representative.';
       return;
     }
-
     data.forEach(sa => {
       const opt = document.createElement('option');
       opt.value = sa.id;
-      opt.textContent = sa.name ? `${sa.name} (${sa.id})` : sa.id;
+      opt.textContent = sa.name ? sa.name + ' (' + sa.id + ')' : sa.id;
       select.appendChild(opt);
     });
-
-    // Auto-select if only one
     if (data.length === 1) select.value = data[0].id;
-
     select.style.display = 'block';
-
   } catch(e) {
     loading.classList.remove('visible');
     errBox.className = 'alert alert-warn visible';
     errBox.textContent = 'Could not load sub-accounts. Check that your RingCentral app has ReadAccounts scope.';
   }
 }
-
 window.addEventListener('DOMContentLoaded', loadSubAccounts);
 
-// ── Start job ─────────────────────────────────────────────────────────────────
 async function doStartJob() {
   const btn          = document.getElementById('btnStart');
   const spin         = document.getElementById('spinStart');
@@ -354,111 +312,67 @@ async function doStartJob() {
   const customer     = document.getElementById('customerName').value.trim() || 'Customer';
   const dateFrom     = document.getElementById('dateFrom').value;
   const dateTo       = document.getElementById('dateTo').value;
-
   al.className = 'alert alert-error';
-  al.textContent = '';
-
-  if (!subAccountId) {
-    al.className = 'alert alert-error visible';
-    al.textContent = 'Please select a RingCX sub-account.';
-    return;
-  }
-  if (!dateFrom || !dateTo) {
-    al.className = 'alert alert-error visible';
-    al.textContent = 'Please select a date range.';
-    return;
-  }
-
-  btn.disabled = true;
-  spin.classList.add('visible');
-  txt.textContent = 'Starting…';
-
+  if (!subAccountId) { al.className='alert alert-error visible'; al.textContent='Please select a RingCX sub-account.'; return; }
+  if (!dateFrom||!dateTo) { al.className='alert alert-error visible'; al.textContent='Please select a date range.'; return; }
+  btn.disabled=true; spin.classList.add('visible'); txt.textContent='Starting...';
   try {
     const res  = await fetch('/api/start-job', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({
-        customer_name:  customer,
-        date_from:      dateFrom,
-        date_to:        dateTo,
-        sub_account_id: subAccountId,
-      })
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({customer_name:customer, date_from:dateFrom, date_to:dateTo, sub_account_id:subAccountId})
     });
     const data = await res.json();
-    if (!res.ok) {
-      al.className = 'alert alert-error visible';
-      al.textContent = data.error || 'Failed to start job.';
-      return;
-    }
-    jobId = data.job_id;
-    seenLogs = 0;
+    if (!res.ok) { al.className='alert alert-error visible'; al.textContent=data.error||'Failed to start job.'; return; }
+    jobId=data.job_id; seenLogs=0;
     goStep(1);
-    pollTimer = setInterval(pollJob, 1500);
+    pollTimer=setInterval(pollJob,1500);
   } catch(e) {
-    al.className = 'alert alert-error visible';
-    al.textContent = 'Network error — could not reach the server.';
+    al.className='alert alert-error visible'; al.textContent='Network error.';
   } finally {
-    btn.disabled = false;
-    spin.classList.remove('visible');
-    txt.textContent = 'Start Download';
+    btn.disabled=false; spin.classList.remove('visible'); txt.textContent='Start Download';
   }
 }
 
-// ── Poll job status ───────────────────────────────────────────────────────────
 async function pollJob() {
   if (!jobId) return;
   try {
-    const res  = await fetch(`/api/job/${jobId}`);
+    const res  = await fetch('/api/job/'+jobId);
     const data = await res.json();
-    const pct  = data.progress || 0;
-
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressPct').textContent  = pct + '%';
-
-    const labels = [
-      'Starting up…',
-      'Fetching interaction metadata…',
-      'Downloading transcripts…',
-      'Building files…',
-      'Finalizing…'
-    ];
-    document.getElementById('progressLabel').textContent =
-      pct >= 100 ? 'Complete!' : labels[Math.min(Math.floor(pct / 20), labels.length - 1)];
-
-    const console_ = document.getElementById('logConsole');
-    const logs = data.log || [];
+    const pct  = data.progress||0;
+    document.getElementById('progressFill').style.width = pct+'%';
+    document.getElementById('progressPct').textContent  = pct+'%';
+    const labels=['Starting up...','Fetching interaction metadata...','Downloading transcripts...','Building files...','Finalizing...'];
+    document.getElementById('progressLabel').textContent = pct>=100?'Complete!':labels[Math.min(Math.floor(pct/20),labels.length-1)];
+    const console_=document.getElementById('logConsole');
+    const logs=data.log||[];
     logs.slice(seenLogs).forEach(line => {
-      const row = document.createElement('div'); row.className = 'log-line';
-      const ts  = document.createElement('span'); ts.className = 'log-ts';   ts.textContent = line.t;
-      const msg = document.createElement('span'); msg.className = `log-${line.level || 'info'}`; msg.textContent = line.msg;
+      const row=document.createElement('div'); row.className='log-line';
+      const ts=document.createElement('span'); ts.className='log-ts'; ts.textContent=line.t;
+      const msg=document.createElement('span'); msg.className='log-'+(line.level||'info'); msg.textContent=line.msg;
       row.appendChild(ts); row.appendChild(msg); console_.appendChild(row);
     });
-    seenLogs = logs.length;
-    if (logs.length) console_.scrollTop = console_.scrollHeight;
-
-    if (data.status === 'done') {
+    seenLogs=logs.length;
+    if (logs.length) console_.scrollTop=console_.scrollHeight;
+    if (data.status==='done') {
       clearInterval(pollTimer);
-      const s = data.summary || {};
-      document.getElementById('statTotal').textContent       = s.total       ?? '—';
-      document.getElementById('statTranscripts').textContent = s.transcripts ?? '—';
-      document.getElementById('statRange').textContent       = s.date_from && s.date_to
-        ? s.date_from.slice(5) + ' – ' + s.date_to.slice(5) : '—';
-      const base = `/api/download/${jobId}/`;
-      (data.files || []).forEach(f => {
-        const el = document.getElementById(f === 'xlsx' ? 'dlXlsx' : 'dlPdf');
-        if (el) { el.href = base + f; el.onclick = null; }
+      const s=data.summary||{};
+      document.getElementById('statTotal').textContent=s.total??'—';
+      document.getElementById('statTranscripts').textContent=s.transcripts??'—';
+      document.getElementById('statRange').textContent=s.date_from&&s.date_to?s.date_from.slice(5)+' – '+s.date_to.slice(5):'—';
+      const base='/api/download/'+jobId+'/';
+      (data.files||[]).forEach(f => {
+        const el=document.getElementById(f==='xlsx'?'dlXlsx':'dlPdf');
+        if (el){el.href=base+f;el.onclick=null;}
       });
-      setTimeout(() => goStep(2), 600);
-
-    } else if (data.status === 'error') {
+      setTimeout(()=>goStep(2),600);
+    } else if (data.status==='error') {
       clearInterval(pollTimer);
-      const al = document.getElementById('alertStep1');
-      al.className = 'alert alert-error visible';
-      al.textContent = 'Error: ' + (data.error || 'Unknown error');
+      const al=document.getElementById('alertStep1');
+      al.className='alert alert-error visible';
+      al.textContent='Error: '+(data.error||'Unknown error');
     }
   } catch(e) {}
 }
 </script>
-
-
-</body></html>
+</body>
+</html>
