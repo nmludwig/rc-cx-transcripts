@@ -352,7 +352,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             end_dt = safe_ceiling
             job_log(job_id, "End date capped to 15 min ago (API processing window).", "warn")
 
-        window   = timedelta(hours=1)   # API max is 3600 s
+        window   = timedelta(minutes=30)   # 1800 seconds per Calabrio docs
 
         all_segments = []   # list of {dialogId, segmentId, metadata…}
 
@@ -362,19 +362,17 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             ts_from = int(cursor.timestamp() * 1000)
             ts_to   = int(window_end.timestamp() * 1000)
 
-            # Integration APIs use ringcx.ringcentral.com with CX token
-            # Path format: /voice/api/v1/admin/accounts/{subAccountId}/... 
-            url = (f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
-                   f"/sub-accounts/{sub_account_id}/interaction-metadata")
+            # v2 endpoint — uses segmentEndTime + timeInterval (seconds) + timeZone
+            url = (f"{CX_BASE}/integration/v2/admin/reports"
+                   f"/accounts/{sub_account_id}/interactionMetadata")
 
-            # Payload field names per validation errors:
-            # timeInterval.segmentStartDate and timeInterval.segmentEndDate
+            # Payload: segmentEndTime = end of window, timeInterval = window size in seconds
+            window_seconds = int((window_end - cursor).total_seconds())
             payload = {
-                "timeInterval": {
-                    "segmentStartDate": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "segmentEndDate":   window_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
-                "pageSize": 200,
+                "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
+                "timeInterval":   window_seconds,
+                "timeZone":       "US/Eastern",
+                "pageSize":       200,
             }
 
             page_token = None
@@ -445,8 +443,8 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
             transcript_url = (
-                f"{CX_BASE}/cx/integration/v1/accounts/{sub_account_id}"
-                f"/sub-accounts/{sub_account_id}"
+                f"{CX_BASE}/integration/v2/admin/reports"
+                f"/accounts/{sub_account_id}"
                 f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
 
