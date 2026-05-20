@@ -155,6 +155,19 @@ def logout():
     return redirect(url_for("index"))
 
 
+@app.route("/debug/token")
+def debug_token():
+    """Temporary debug route — remove before production."""
+    if not session.get("cx_token"):
+        return jsonify({"error": "not logged in"}), 401
+    return jsonify({
+        "cx_token_full": session.get("cx_token", ""),
+        "rc_token_full": session.get("rc_token", ""),
+        "rc_account_id": session.get("rc_account_id"),
+        "sub_accounts":  session.get("rc_sub_accounts"),
+    })
+
+
 # ---------------------------------------------------------------------------
 # CX Token Exchange (Step 2 of auth)
 # ---------------------------------------------------------------------------
