@@ -379,7 +379,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             end_dt = safe_ceiling
             job_log(job_id, "End date capped to 15 min ago (API processing window).", "warn")
 
-        window       = timedelta(hours=24)  # try max window to minimize API calls
+        window       = timedelta(hours=3)  # max allowed by v1 API is 10800 seconds
 
         all_segments = []
         cursor       = start_dt
@@ -394,7 +394,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
 
             payload = {
                 "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
-                "timeInterval":   min(window_seconds, 86400),
+                "timeInterval":   min(window_seconds, 10800),
                 "timeZone":       "US/Eastern",
                 "pageSize":       200,
             }
