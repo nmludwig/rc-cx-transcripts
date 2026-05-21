@@ -463,21 +463,29 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             job_log(job_id, f"First segment full: {str(all_segments[0])}", "info")
 
         for i, seg in enumerate(all_segments):
-            # Per RingCX docs: dialogId and segmentId are the correct field names
-            dialog_id  = seg.get("dialogId",  seg.get("interactionId", ""))
-            segment_id = seg.get("segmentId", seg.get("segmentID", ""))
+            # Extract s-v-... and p-v-... IDs from segmentRecordingURL
+            # These are the correct dialogId/segmentId for the transcript endpoint
+            recording_url = seg.get("segmentRecordingURL", "")
+            sv_id = ""
+            pv_id = ""
+            if recording_url:
+                sv_match = re.search(r'dialogs/(s-v-[^/]+)', recording_url)
+                pv_match = re.search(r'segments/(p-v-[^/]+)/type', recording_url)
+                if sv_match:
+                    sv_id = sv_match.group(1)
+                if pv_match:
+                    pv_id = pv_match.group(1)
 
-            if not dialog_id or not segment_id:
+            if not sv_id or not pv_id:
                 continue
 
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
-            # Correct transcript endpoint per RingCX docs:
-            # GET /voice/api/cx/integration/v1/accounts/{rcAccountId}/sub-accounts/{subAccountId}/transcripts/dialogs/{dialogId}/segments/{segmentId}
+            # Transcript endpoint uses s-v-... as dialogId and p-v-... as segmentId
             tr_url = (
                 f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
                 f"/sub-accounts/{sub_account_id}"
-                f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
+                f"/transcripts/dialogs/{sv_id}/segments/{pv_id}"
             )
 
             transcript_data = None
@@ -546,7 +554,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                 "to_name":        to_name,
                 "queue_name":     queue_name,
                 "agent_name":     agent_name,
-                "channel":        "VOICE",
+                "channel":        transcript_data.get("channelClass", "VOICE") if transcript_data else "VOICE",
                 "has_transcript": bool(lines),
                 "transcript":     "\n".join(lines),
                 "summary":        "",
