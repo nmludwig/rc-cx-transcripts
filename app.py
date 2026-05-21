@@ -351,7 +351,7 @@ def _cx_headers(token: str) -> dict:
 def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh_token,
                         rc_account_id, sub_account_id, customer_name, date_from, date_to):
     job = jobs[job_id]
-    # WEM integration API uses CX token on ringcx.ringcentral.com
+    # All CX integration APIs use CX token on ringcx.ringcentral.com
     token = cx_token
     refresh_token = cx_refresh_token
     try:
@@ -361,10 +361,15 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
         job["progress"] = 5
 
         # ------------------------------------------------------------------
-        # Step 1 — Collect interaction metadata in 30-min windows
-        # WEM API: POST /integration/v2/admin/reports/{subAccountId}/interactionMetadata
+        # Step 1 — Interaction Metadata
+        # Endpoint: POST /voice/api/cx/integration/v1/accounts/{rcAccountId}/sub-accounts/{subAccountId}/interaction-metadata
+        # Rate limit: 2 calls/minute → 31s delay between calls
+        # Max timeInterval: 3600 seconds (1 hour) per docs
+        # Payload: segmentEndTime + timeInterval + timeZone
+        # Filter: hasTranscript: true
         # ------------------------------------------------------------------
-        job_log(job_id, "Fetching interaction metadata from RingCX WEM API…")
+        job_log(job_id, "Fetching interaction metadata from RingCX…")
+        job_log(job_id, "Rate limit: 2 calls/min — this may take a few minutes.", "warn")
 
         from datetime import timedelta
 
@@ -374,42 +379,52 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
         start_dt = parse_dt(date_from)
         end_dt   = parse_dt(date_to).replace(hour=23, minute=59, second=59)
 
+        # Per docs: data must be fetched at least 5 minutes before current time
         safe_ceiling = datetime.now(timezone.utc) - timedelta(minutes=15)
         if end_dt > safe_ceiling:
             end_dt = safe_ceiling
             job_log(job_id, "End date capped to 15 min ago (API processing window).", "warn")
 
-        window       = timedelta(hours=3)  # max allowed by v1 API is 10800 seconds
-
+        # Use maximum allowed window (3600s = 1 hour) to minimize API calls
+        window       = timedelta(hours=1)
         all_segments = []
         cursor       = start_dt
+        total_windows = int((end_dt - start_dt).total_seconds() / 3600) + 1
+
+        job_log(job_id, f"Scanning {total_windows} hourly windows — est. {round(total_windows * 31 / 60, 1)} min at 2 calls/min rate limit")
+
+        metadata_url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
+                        f"/sub-accounts/{sub_account_id}/interaction-metadata")
+
+        backoff = 31  # start at 31s, matches 2 calls/min limit
+        window_count = 0
 
         while cursor < end_dt:
             window_end     = min(cursor + window, end_dt)
             window_seconds = int((window_end - cursor).total_seconds())
 
-            # v1 endpoint correct payload: segmentEndTime + timeInterval + timeZone
-            url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
-                   f"/sub-accounts/{sub_account_id}/interaction-metadata")
-
             payload = {
                 "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
-                "timeInterval":   min(window_seconds, 10800),
+                "timeInterval":   min(window_seconds, 3600),
                 "timeZone":       "US/Eastern",
                 "pageSize":       200,
             }
 
             page_token = None
+            success = False
+
             while True:
                 if page_token:
                     payload["pageToken"] = page_token
 
-                for attempt in range(3):
-                    r = requests.post(url, json=payload,
+                # Exponential backoff per docs
+                for attempt in range(5):
+                    r = requests.post(metadata_url, json=payload,
                                       headers=_cx_headers(token), timeout=30)
                     if r.status_code == 429:
-                        job_log(job_id, "Rate limit — waiting 35 s…", "warn")
-                        time.sleep(35)
+                        wait = backoff * (2 ** attempt)
+                        job_log(job_id, f"Rate limited — waiting {wait}s (backoff)…", "warn")
+                        time.sleep(wait)
                         continue
                     if r.status_code == 401:
                         new_tok, refresh_token = _refresh_cx_token(refresh_token)
@@ -421,64 +436,71 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
 
                 if r.status_code != 200:
                     job_log(job_id, f"Metadata fetch failed ({r.status_code}): {r.text[:200]}", "warn")
-                    job_log(job_id, f"Payload tried: {payload}", "warn")
                     break
 
+                success = True
                 body = r.json()
                 if isinstance(body, list):
                     segments, page_token = body, None
                 else:
-                    segments   = body.get("segments", body.get("records", body.get("interactions", [])))
+                    segments   = body.get("segments", body.get("records", []))
                     page_token = body.get("nextPageToken") or body.get("paging", {}).get("nextPageToken")
 
-                all_segments.extend(segments)
+                # Filter: only segments with hasTranscript: true
+                with_transcript = [s for s in segments if s.get("hasTranscript", False)]
+                all_segments.extend(with_transcript)
+
                 if not page_token:
                     break
-                time.sleep(31)   # 2 calls/min limit = 1 call per 30s
+                time.sleep(1)  # small delay between pages of same window
 
+            window_count += 1
             cursor = window_end + timedelta(seconds=1)
 
-        job["progress"] = 20
-        job_log(job_id, f"Found {len(all_segments)} interaction segments", "ok")
+            # Respect 2 calls/min rate limit between windows
+            if success and cursor < end_dt:
+                time.sleep(31)
+
+            # Update progress
+            job["progress"] = 5 + int(30 * (window_count / max(total_windows, 1)))
+
+        job["progress"] = 35
+        job_log(job_id, f"Found {len(all_segments)} segments with transcripts", "ok")
 
         if not all_segments:
             job.update({"status": "done", "progress": 100,
                         "summary": {"total": 0, "transcripts": 0}})
-            job_log(job_id, "No interactions found. Ensure recording is activated and AI Summaries are enabled on your RingCX queues.", "warn")
+            job_log(job_id, "No interactions with transcripts found.", "warn")
+            job_log(job_id, "Ensure AI Summaries are enabled on your RingCX voice queues.", "warn")
             return
 
         # ------------------------------------------------------------------
-        # Step 2 — Fetch transcript for each segment
+        # Step 2 — Fetch transcripts
+        # Endpoint: GET /voice/api/cx/integration/v1/accounts/{rcAccountId}/sub-accounts/{subAccountId}/transcripts/dialogs/{dialogId}/segments/{segmentId}
+        # Rate limit: 120 calls/minute per docs → 0.5s delay is fine
+        # dialogId = seg["dialogId"], segmentId = seg["segmentId"]
         # ------------------------------------------------------------------
         total              = len(all_segments)
         transcript_records = []
         with_transcripts   = 0
 
-        job_log(job_id, f"Fetching transcripts for {total} segments…")
-        job_log(job_id, f"Estimated time: ~{round(total * 0.5 / 60, 1)} min", "warn")
-        if all_segments:
-            job_log(job_id, f"First segment keys: {list(all_segments[0].keys())}", "info")
-            job_log(job_id, f"First segment full: {str(all_segments[0])}", "info")
+        job_log(job_id, f"Fetching {total} transcripts at 120 calls/min…")
+        job_log(job_id, f"Estimated time: ~{round(total * 0.5 / 60, 1)} min")
 
         for i, seg in enumerate(all_segments):
-            # v1 endpoint returns dialogId and segmentId directly
-            sv_id = seg.get("dialogId", "")
-            pv_id = seg.get("segmentId", "")
+            # dialogId and segmentId are returned directly by the v1 metadata API
+            dialog_id  = seg.get("dialogId", "")
+            segment_id = seg.get("segmentId", "")
 
-            # Skip if no transcript available
-            if not seg.get("hasTranscript", False):
+            if not dialog_id or not segment_id:
                 continue
 
-            if not sv_id or not pv_id:
-                continue
+            job["progress"] = 35 + int(50 * (i / max(total, 1)))
 
-            job["progress"] = 20 + int(65 * (i / max(total, 1)))
-
-            # Transcript endpoint
             tr_url = (
                 f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
                 f"/sub-accounts/{sub_account_id}"
-                f"/transcripts/dialogs/{sv_id}/segments/{pv_id}"
+                f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
 
             transcript_data = None
@@ -486,11 +508,13 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                 try:
                     tr = requests.get(tr_url, headers=_cx_headers(token), timeout=20)
                     if tr.status_code == 429:
-                        time.sleep(30 * (attempt + 1))
+                        wait = 30 * (2 ** attempt)
+                        job_log(job_id, f"Rate limited on transcript — waiting {wait}s…", "warn")
+                        time.sleep(wait)
                         continue
                     if tr.status_code == 404:
-                        if i < 3:
-                            job_log(job_id, f"No transcript for {sv_id}/{pv_id} (404)", "warn")
+                        if i < 5:
+                            job_log(job_id, f"No transcript for {dialog_id}/{segment_id} (404)", "warn")
                         break
                     if tr.status_code == 401:
                         new_tok, refresh_token = _refresh_cx_token(refresh_token)
@@ -499,19 +523,14 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         continue
                     if tr.status_code == 200:
                         transcript_data = tr.json()
-                        if i < 3:
-                            job_log(job_id, f"Transcript sample: {str(transcript_data)[:300]}", "info")
                         break
-                    if i < 3:
-                        job_log(job_id, f"Transcript fetch {tr.status_code}: {tr.text[:150]}", "warn")
                     break
-                except Exception as e:
+                except Exception:
                     time.sleep(2)
 
             lines = []
             if transcript_data:
                 with_transcripts += 1
-                # JSON format per docs: {channelClass, transcript: [{participantId, participantName, timestamp, message}]}
                 utterances = transcript_data.get("transcript", [])
                 for u in utterances:
                     name  = u.get("participantName", u.get("participantId", "?"))
@@ -529,22 +548,20 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             duration_sec = int(seg.get("dialogDurationMs", seg.get("segmentDurationMs", 0)) or 0) // 1000
             direction    = seg.get("dialogOrigination", "")
             from_number  = seg.get("contactEndpointAddress", "")
-            from_name    = ""
             to_number    = seg.get("channelEndpointAddress", "")
-            to_name      = ""
             queue_name   = seg.get("campaignName", "")
             agent_name   = seg.get("segmentParticipantId", "")
 
             transcript_records.append({
-                "dialog_id":      sv_id,
-                "segment_id":     pv_id,
+                "dialog_id":      dialog_id,
+                "segment_id":     segment_id,
                 "start_time":     start_time,
                 "duration_sec":   duration_sec,
                 "direction":      direction,
                 "from_number":    from_number,
-                "from_name":      from_name,
+                "from_name":      "",
                 "to_number":      to_number,
-                "to_name":        to_name,
+                "to_name":        "",
                 "queue_name":     queue_name,
                 "agent_name":     agent_name,
                 "channel":        transcript_data.get("channelClass", "VOICE") if transcript_data else "VOICE",
@@ -556,13 +573,13 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             if (i + 1) % 10 == 0:
                 job_log(job_id, f"Processed {i+1}/{total} ({with_transcripts} transcripts)")
 
+            # Refresh CX token every 20 calls (expires in ~5 min)
             if (i + 1) % 20 == 0:
                 new_tok, refresh_token = _refresh_cx_token(refresh_token)
                 if new_tok:
                     token = new_tok
-                    job_log(job_id, "CX token refreshed.", "ok")
 
-            time.sleep(0.5)
+            time.sleep(0.5)  # 120 calls/min limit = 0.5s delay
 
         job_log(job_id, f"{with_transcripts} of {total} segments have transcripts", "ok")
         job["progress"] = 88
