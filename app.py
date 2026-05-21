@@ -388,14 +388,16 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             window_end     = min(cursor + window, end_dt)
             window_seconds = int((window_end - cursor).total_seconds())
 
-            url = (f"{CX_BASE}/integration/v2/admin/reports"
-                   f"/accounts/{sub_account_id}/interactionMetadata")
+            # Correct endpoint per RingCX docs: /voice/api/cx/integration/v1/
+            url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
+                   f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
             payload = {
-                "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
-                "timeInterval":   min(window_seconds, 3600),
-                "timeZone":       "UTC",
-                "pageSize":       200,
+                "timeInterval": {
+                    "startTime": int(cursor.timestamp() * 1000),
+                    "endTime":   int(window_end.timestamp() * 1000),
+                },
+                "pageSize": 200,
             }
 
             page_token = None
@@ -459,36 +461,24 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             job_log(job_id, f"First segment full: {str(all_segments[0])}", "info")
 
         for i, seg in enumerate(all_segments):
-            dialog_id  = seg.get("interactionId", "")
-            segment_id = seg.get("segmentID", "")
+            # Per RingCX docs: dialogId and segmentId are the correct field names
+            dialog_id  = seg.get("dialogId",  seg.get("interactionId", ""))
+            segment_id = seg.get("segmentId", seg.get("segmentID", ""))
 
-            # Extract s-v-... and p-v-... IDs from segmentRecordingURL
-            recording_url = seg.get("segmentRecordingURL", "")
-            sv_id = ""
-            pv_id = ""
-            if recording_url:
-                import re as _re
-                sv_match = _re.search(r'dialogs/(s-v-[^/]+)', recording_url)
-                pv_match = _re.search(r'segments/(p-v-[^/]+)/type', recording_url)
-                if sv_match:
-                    sv_id = sv_match.group(1)
-                if pv_match:
-                    pv_id = pv_match.group(1)
-
-            if not sv_id or not pv_id:
+            if not dialog_id or not segment_id:
                 continue
 
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
-            # Transcript URL format: /api/v2/transcript/account/{rcAccountId}/subaccount/{subAccountId}/{sv_id}/{pv_id}.txt
+            # Correct transcript endpoint per RingCX docs:
+            # GET /voice/api/cx/integration/v1/accounts/{rcAccountId}/sub-accounts/{subAccountId}/transcripts/dialogs/{dialogId}/segments/{segmentId}
             tr_url = (
-                f"https://ringcx.ringcentral.com/api/v2/transcript"
-                f"/account/{rc_account_id}/subaccount/{sub_account_id}"
-                f"/{sv_id}/{pv_id}.txt"
+                f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
+                f"/sub-accounts/{sub_account_id}"
+                f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
 
             transcript_data = None
-            transcript_text = ""
             for attempt in range(4):
                 try:
                     tr = requests.get(tr_url, headers=_cx_headers(token), timeout=20)
@@ -497,7 +487,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         continue
                     if tr.status_code == 404:
                         if i < 3:
-                            job_log(job_id, f"No transcript for segment {sv_id} (404)", "warn")
+                            job_log(job_id, f"No transcript for {dialog_id}/{segment_id} (404)", "warn")
                         break
                     if tr.status_code == 401:
                         new_tok, refresh_token = _refresh_cx_token(refresh_token)
@@ -505,9 +495,9 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                             token = new_tok
                         continue
                     if tr.status_code == 200:
-                        transcript_text = tr.text
+                        transcript_data = tr.json()
                         if i < 3:
-                            job_log(job_id, f"Transcript sample: {transcript_text[:200]}", "info")
+                            job_log(job_id, f"Transcript sample: {str(transcript_data)[:300]}", "info")
                         break
                     if i < 3:
                         job_log(job_id, f"Transcript fetch {tr.status_code}: {tr.text[:150]}", "warn")
@@ -516,13 +506,21 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     time.sleep(2)
 
             lines = []
-            if transcript_text:
+            if transcript_data:
                 with_transcripts += 1
-                # Plain text format — each line is a transcript utterance
-                for line in transcript_text.strip().split("\n"):
-                    line = line.strip()
-                    if line:
-                        lines.append(line)
+                # JSON format per docs: {channelClass, transcript: [{participantId, participantName, timestamp, message}]}
+                utterances = transcript_data.get("transcript", [])
+                for u in utterances:
+                    name  = u.get("participantName", u.get("participantId", "?"))
+                    text  = u.get("message", "").strip()
+                    ts_ms = u.get("timestamp", 0)
+                    try:
+                        secs = int(ts_ms) // 1000 if ts_ms else 0
+                        ts   = f"[{secs//60:02d}:{secs%60:02d}]"
+                    except Exception:
+                        ts = ""
+                    if text:
+                        lines.append(f"{ts} {name}: {text}")
 
             start_time   = seg.get("interactionStartTimeMs", seg.get("segmentContactStartTimeMs", ""))
             duration_sec = int(seg.get("segmentDuration", seg.get("interactionDurationMs", 0)) or 0)
