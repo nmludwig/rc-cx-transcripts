@@ -459,20 +459,36 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             job_log(job_id, f"First segment full: {str(all_segments[0])}", "info")
 
         for i, seg in enumerate(all_segments):
-            dialog_id  = seg.get("dialogId",  seg.get("dialog_id",  ""))
-            segment_id = seg.get("segmentId", seg.get("segment_id", ""))
-            if not dialog_id or not segment_id:
+            dialog_id  = seg.get("interactionId", "")
+            segment_id = seg.get("segmentID", "")
+
+            # Extract s-v-... and p-v-... IDs from segmentRecordingURL
+            recording_url = seg.get("segmentRecordingURL", "")
+            sv_id = ""
+            pv_id = ""
+            if recording_url:
+                import re as _re
+                sv_match = _re.search(r'dialogs/(s-v-[^/]+)', recording_url)
+                pv_match = _re.search(r'segments/(p-v-[^/]+)/type', recording_url)
+                if sv_match:
+                    sv_id = sv_match.group(1)
+                if pv_match:
+                    pv_id = pv_match.group(1)
+
+            if not sv_id or not pv_id:
                 continue
 
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
+            # Transcript URL format: /api/v2/transcript/account/{rcAccountId}/subaccount/{subAccountId}/{sv_id}/{pv_id}.txt
             tr_url = (
-                f"{CX_BASE}/integration/v2/admin/reports"
-                f"/accounts/{sub_account_id}"
-                f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
+                f"https://ringcx.ringcentral.com/api/v2/transcript"
+                f"/account/{rc_account_id}/subaccount/{sub_account_id}"
+                f"/{sv_id}/{pv_id}.txt"
             )
 
             transcript_data = None
+            transcript_text = ""
             for attempt in range(4):
                 try:
                     tr = requests.get(tr_url, headers=_cx_headers(token), timeout=20)
@@ -481,7 +497,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         continue
                     if tr.status_code == 404:
                         if i < 3:
-                            job_log(job_id, f"Segment {dialog_id}/{segment_id}: no transcript (404)", "warn")
+                            job_log(job_id, f"No transcript for segment {sv_id} (404)", "warn")
                         break
                     if tr.status_code == 401:
                         new_tok, refresh_token = _refresh_cx_token(refresh_token)
@@ -489,9 +505,9 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                             token = new_tok
                         continue
                     if tr.status_code == 200:
-                        transcript_data = tr.json()
+                        transcript_text = tr.text
                         if i < 3:
-                            job_log(job_id, f"Transcript sample: {str(transcript_data)[:200]}", "info")
+                            job_log(job_id, f"Transcript sample: {transcript_text[:200]}", "info")
                         break
                     if i < 3:
                         job_log(job_id, f"Transcript fetch {tr.status_code}: {tr.text[:150]}", "warn")
@@ -500,36 +516,27 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     time.sleep(2)
 
             lines = []
-            if transcript_data:
+            if transcript_text:
                 with_transcripts += 1
-                utterances = transcript_data.get("transcript", [])
-                for u in utterances:
-                    name  = u.get("participantName", u.get("participantId", "?"))
-                    text  = u.get("message", u.get("text", "")).strip()
-                    ts_ms = u.get("timestamp", 0)
-                    try:
-                        secs = int(ts_ms) // 1000 if ts_ms else 0
-                        ts   = f"[{secs//60:02d}:{secs%60:02d}]"
-                    except Exception:
-                        ts = ""
-                    if text:
-                        lines.append(f"{ts} {name}: {text}")
+                # Plain text format — each line is a transcript utterance
+                for line in transcript_text.strip().split("\n"):
+                    line = line.strip()
+                    if line:
+                        lines.append(line)
 
-            start_time   = seg.get("startTime",   seg.get("start_time",  ""))
-            duration_sec = int(seg.get("duration", seg.get("durationMs", 0)) or 0)
-            if duration_sec > 10000:
-                duration_sec = duration_sec // 1000
-            direction    = seg.get("direction",   seg.get("callDirection", ""))
-            from_number  = seg.get("fromNumber",  seg.get("ani",  ""))
-            from_name    = seg.get("fromName",    seg.get("agentName", ""))
-            to_number    = seg.get("toNumber",    seg.get("dnis", ""))
-            to_name      = seg.get("toName",      seg.get("queueName", ""))
-            queue_name   = seg.get("queueName",   seg.get("skillName", ""))
-            agent_name   = seg.get("agentName",   "")
+            start_time   = seg.get("interactionStartTimeMs", seg.get("segmentContactStartTimeMs", ""))
+            duration_sec = int(seg.get("segmentDuration", seg.get("interactionDurationMs", 0)) or 0)
+            direction    = seg.get("interactionDirection", "")
+            from_number  = seg.get("interactionCallingAddress", "")
+            from_name    = ""
+            to_number    = seg.get("interactionCalledAddress", "")
+            to_name      = ""
+            queue_name   = seg.get("campaignName", "")
+            agent_name   = seg.get("segmentAgentId", "")
 
             transcript_records.append({
-                "dialog_id":      dialog_id,
-                "segment_id":     segment_id,
+                "dialog_id":      sv_id,
+                "segment_id":     pv_id,
                 "start_time":     start_time,
                 "duration_sec":   duration_sec,
                 "direction":      direction,
@@ -539,7 +546,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                 "to_name":        to_name,
                 "queue_name":     queue_name,
                 "agent_name":     agent_name,
-                "channel":        transcript_data.get("channelClass", "VOICE") if transcript_data else "VOICE",
+                "channel":        "VOICE",
                 "has_transcript": bool(lines),
                 "transcript":     "\n".join(lines),
                 "summary":        "",
