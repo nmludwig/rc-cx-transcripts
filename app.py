@@ -392,10 +392,11 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
                    f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
+            # v1 endpoint — try ISO 8601 date strings per earlier validation errors
             payload = {
                 "timeInterval": {
-                    "startTime": int(cursor.timestamp() * 1000),
-                    "endTime":   int(window_end.timestamp() * 1000),
+                    "segmentStartDate": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    "segmentEndDate":   window_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 },
                 "pageSize": 200,
             }
@@ -422,6 +423,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
 
                 if r.status_code != 200:
                     job_log(job_id, f"Metadata fetch failed ({r.status_code}): {r.text[:200]}", "warn")
+                    job_log(job_id, f"Payload tried: {payload}", "warn")
                     break
 
                 body = r.json()
