@@ -351,9 +351,9 @@ def _cx_headers(token: str) -> dict:
 def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh_token,
                         rc_account_id, sub_account_id, customer_name, date_from, date_to):
     job = jobs[job_id]
-    # RingSense API uses RC token on platform.ringcentral.com
-    token = rc_token
-    refresh_token = rc_refresh_token
+    # WEM integration API uses CX token on ringcx.ringcentral.com
+    token = cx_token
+    refresh_token = cx_refresh_token
     try:
         job_log(job_id, f"Starting RingCX transcript download for {customer_name}")
         job_log(job_id, f"RC Account: {rc_account_id}  |  CX Sub-account: {sub_account_id}")
@@ -361,164 +361,191 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
         job["progress"] = 5
 
         # ------------------------------------------------------------------
-        # Step 1 — Fetch RingSense insights for domain=rcx
+        # Step 1 — Collect interaction metadata in 30-min windows
+        # WEM API: POST /integration/v2/admin/reports/{subAccountId}/interactionMetadata
         # ------------------------------------------------------------------
-        job_log(job_id, "Fetching RingSense insights (domain=rcx)…")
+        job_log(job_id, "Fetching interaction metadata from RingCX WEM API…")
 
         from datetime import timedelta
 
-        date_from_iso = date_from + "T00:00:00.000Z"
-        date_to_iso   = date_to   + "T23:59:59.000Z"
+        def parse_dt(s):
+            return datetime.fromisoformat(s + "T00:00:00").replace(tzinfo=timezone.utc)
 
-        insights_url = (
-            f"https://platform.ringcentral.com/ai/ringsense/v1/public"
-            f"/accounts/{rc_account_id}/domains/rcx/insights"
-        )
+        start_dt = parse_dt(date_from)
+        end_dt   = parse_dt(date_to).replace(hour=23, minute=59, second=59)
 
-        all_insights = []
-        page_token   = None
+        safe_ceiling = datetime.now(timezone.utc) - timedelta(minutes=15)
+        if end_dt > safe_ceiling:
+            end_dt = safe_ceiling
+            job_log(job_id, "End date capped to 15 min ago (API processing window).", "warn")
 
-        while True:
-            params = {"startTime": date_from_iso, "endTime": date_to_iso, "perPage": 100}
-            if page_token:
-                params["pageToken"] = page_token
+        window       = timedelta(minutes=30)
+        all_segments = []
+        cursor       = start_dt
 
-            for attempt in range(3):
-                r = requests.get(insights_url, params=params,
-                                 headers={"Authorization": f"Bearer {token}"}, timeout=30)
-                if r.status_code == 429:
-                    job_log(job_id, "Rate limit — waiting 30 s…", "warn")
-                    time.sleep(30)
-                    continue
-                if r.status_code == 401:
-                    token, refresh_token = refresh_rc_token(refresh_token)
-                    if token:
-                        job_log(job_id, "Token refreshed.", "ok")
-                    continue
-                break
+        while cursor < end_dt:
+            window_end     = min(cursor + window, end_dt)
+            window_seconds = int((window_end - cursor).total_seconds())
 
-            if r.status_code != 200:
-                job_log(job_id, f"Insights fetch failed ({r.status_code}): {r.text[:300]}", "warn")
-                break
+            url = (f"{CX_BASE}/integration/v2/admin/reports"
+                   f"/accounts/{sub_account_id}/interactionMetadata")
 
-            body      = r.json()
-            records   = body.get("records", [])
-            all_insights.extend(records)
-            job_log(job_id, f"Page: {len(records)} insights ({len(all_insights)} total)")
+            payload = {
+                "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
+                "timeInterval":   window_seconds,
+                "timeZone":       "US/Eastern",
+                "pageSize":       200,
+            }
 
-            nav        = body.get("navigation", {})
-            page_token = nav.get("nextPageToken") or body.get("nextPageToken")
-            if not page_token or not records:
-                break
-            time.sleep(0.5)
+            page_token = None
+            while True:
+                if page_token:
+                    payload["pageToken"] = page_token
 
-        job["progress"] = 25
-        job_log(job_id, f"Found {len(all_insights)} RingSense insights", "ok")
+                for attempt in range(3):
+                    r = requests.post(url, json=payload,
+                                      headers=_cx_headers(token), timeout=30)
+                    if r.status_code == 429:
+                        job_log(job_id, "Rate limit — waiting 35 s…", "warn")
+                        time.sleep(35)
+                        continue
+                    if r.status_code == 401:
+                        new_tok, refresh_token = _refresh_cx_token(refresh_token)
+                        if new_tok:
+                            token = new_tok
+                            job_log(job_id, "CX token refreshed.", "ok")
+                        continue
+                    break
 
-        if not all_insights:
+                if r.status_code != 200:
+                    job_log(job_id, f"Metadata fetch failed ({r.status_code}): {r.text[:200]}", "warn")
+                    break
+
+                body = r.json()
+                if isinstance(body, list):
+                    segments, page_token = body, None
+                else:
+                    segments   = body.get("segments", body.get("records", body.get("interactions", [])))
+                    page_token = body.get("nextPageToken") or body.get("paging", {}).get("nextPageToken")
+
+                all_segments.extend(segments)
+                if not page_token:
+                    break
+                time.sleep(0.6)
+
+            cursor = window_end + timedelta(seconds=1)
+
+        job["progress"] = 20
+        job_log(job_id, f"Found {len(all_segments)} interaction segments", "ok")
+
+        if not all_segments:
             job.update({"status": "done", "progress": 100,
                         "summary": {"total": 0, "transcripts": 0}})
-            job_log(job_id, "No RingSense insights found for this date range.", "warn")
-            job_log(job_id, "Ensure AI Summaries are enabled on your RingCX queues.", "warn")
+            job_log(job_id, "No interactions found. Ensure recording is activated and AI Summaries are enabled on your RingCX queues.", "warn")
             return
 
         # ------------------------------------------------------------------
-        # Step 2 — Fetch full transcript for each insight
+        # Step 2 — Fetch transcript for each segment
         # ------------------------------------------------------------------
-        total              = len(all_insights)
+        total              = len(all_segments)
         transcript_records = []
         with_transcripts   = 0
 
-        job_log(job_id, f"Fetching transcripts for {total} insights…")
+        job_log(job_id, f"Fetching transcripts for {total} segments…")
         job_log(job_id, f"Estimated time: ~{round(total * 0.5 / 60, 1)} min", "warn")
 
-        for i, insight in enumerate(all_insights):
-            job["progress"] = 25 + int(60 * (i / max(total, 1)))
+        for i, seg in enumerate(all_segments):
+            dialog_id  = seg.get("dialogId",  seg.get("dialog_id",  ""))
+            segment_id = seg.get("segmentId", seg.get("segment_id", ""))
+            if not dialog_id or not segment_id:
+                continue
 
-            insight_id = insight.get("id", "")
+            job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
             tr_url = (
-                f"https://platform.ringcentral.com/ai/ringsense/v1/public"
-                f"/accounts/{rc_account_id}/domains/rcx/insights/{insight_id}"
+                f"{CX_BASE}/integration/v2/admin/reports"
+                f"/accounts/{sub_account_id}"
+                f"/transcripts/dialogs/{dialog_id}/segments/{segment_id}"
             )
 
             transcript_data = None
-            for attempt in range(3):
+            for attempt in range(4):
                 try:
-                    tr = requests.get(tr_url, headers={"Authorization": f"Bearer {token}"}, timeout=20)
+                    tr = requests.get(tr_url, headers=_cx_headers(token), timeout=20)
                     if tr.status_code == 429:
                         time.sleep(30 * (attempt + 1))
                         continue
+                    if tr.status_code == 404:
+                        break
                     if tr.status_code == 401:
-                        token, refresh_token = refresh_rc_token(refresh_token)
+                        new_tok, refresh_token = _refresh_cx_token(refresh_token)
+                        if new_tok:
+                            token = new_tok
                         continue
                     if tr.status_code == 200:
                         transcript_data = tr.json()
                         break
-                    break
                 except Exception:
                     time.sleep(2)
 
             lines = []
             if transcript_data:
                 with_transcripts += 1
-                utterances = (transcript_data.get("transcript", {})
-                              .get("utterances", transcript_data.get("utterances", [])))
+                utterances = transcript_data.get("transcript", [])
                 for u in utterances:
-                    speaker = u.get("speakerName", u.get("speaker", "?"))
-                    text    = u.get("text", u.get("content", "")).strip()
-                    start   = u.get("start", 0)
+                    name  = u.get("participantName", u.get("participantId", "?"))
+                    text  = u.get("message", u.get("text", "")).strip()
+                    ts_ms = u.get("timestamp", 0)
                     try:
-                        secs = int(float(start))
+                        secs = int(ts_ms) // 1000 if ts_ms else 0
                         ts   = f"[{secs//60:02d}:{secs%60:02d}]"
                     except Exception:
                         ts = ""
                     if text:
-                        lines.append(f"{ts} {speaker}: {text}")
+                        lines.append(f"{ts} {name}: {text}")
 
-            start_time   = insight.get("recordingStartTime", insight.get("creationTime", ""))
-            duration_ms  = insight.get("recordingDurationMs", 0)
-            duration_sec = int(duration_ms) // 1000 if duration_ms else 0
-            direction    = insight.get("callDirection", "")
-            speakers     = insight.get("speakerInfo", [])
-            agent        = next((s for s in speakers if s.get("extensionId")), {})
-            caller       = next((s for s in speakers if not s.get("extensionId")), {})
-            summary      = ""
-            if transcript_data:
-                summary = (transcript_data.get("summary", {}).get("text", "")
-                           or transcript_data.get("aiSummary", "")
-                           or "")
+            start_time   = seg.get("startTime",   seg.get("start_time",  ""))
+            duration_sec = int(seg.get("duration", seg.get("durationMs", 0)) or 0)
+            if duration_sec > 10000:
+                duration_sec = duration_sec // 1000
+            direction    = seg.get("direction",   seg.get("callDirection", ""))
+            from_number  = seg.get("fromNumber",  seg.get("ani",  ""))
+            from_name    = seg.get("fromName",    seg.get("agentName", ""))
+            to_number    = seg.get("toNumber",    seg.get("dnis", ""))
+            to_name      = seg.get("toName",      seg.get("queueName", ""))
+            queue_name   = seg.get("queueName",   seg.get("skillName", ""))
+            agent_name   = seg.get("agentName",   "")
 
             transcript_records.append({
-                "insight_id":     insight_id,
+                "dialog_id":      dialog_id,
+                "segment_id":     segment_id,
                 "start_time":     start_time,
                 "duration_sec":   duration_sec,
                 "direction":      direction,
-                "title":          insight.get("title", ""),
-                "from_number":    caller.get("phoneNumber", ""),
-                "from_name":      caller.get("name", ""),
-                "to_number":      agent.get("phoneNumber", ""),
-                "to_name":        "",
-                "queue_name":     "",
-                "agent_name":     agent.get("name", ""),
-                "channel":        "VOICE",
+                "from_number":    from_number,
+                "from_name":      from_name,
+                "to_number":      to_number,
+                "to_name":        to_name,
+                "queue_name":     queue_name,
+                "agent_name":     agent_name,
+                "channel":        transcript_data.get("channelClass", "VOICE") if transcript_data else "VOICE",
                 "has_transcript": bool(lines),
                 "transcript":     "\n".join(lines),
-                "summary":        summary,
+                "summary":        "",
             })
 
             if (i + 1) % 10 == 0:
                 job_log(job_id, f"Processed {i+1}/{total} ({with_transcripts} transcripts)")
 
-            if (i + 1) % 50 == 0:
-                new_tok, refresh_token = refresh_rc_token(refresh_token)
+            if (i + 1) % 20 == 0:
+                new_tok, refresh_token = _refresh_cx_token(refresh_token)
                 if new_tok:
                     token = new_tok
-                    job_log(job_id, "RC token refreshed.", "ok")
+                    job_log(job_id, "CX token refreshed.", "ok")
 
             time.sleep(0.5)
 
-        job_log(job_id, f"{with_transcripts} of {total} insights have transcripts", "ok")
+        job_log(job_id, f"{with_transcripts} of {total} segments have transcripts", "ok")
         job["progress"] = 88
 
         # ------------------------------------------------------------------
