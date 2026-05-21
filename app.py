@@ -124,25 +124,37 @@ def oauth_callback():
     rc_token        = rc_data["access_token"]
     rc_refresh      = rc_data.get("refresh_token", "")
 
-    # ------------------------------------------------------------------
-    # Step 2 — Exchange RC token for a RingCX-specific token
-    # The CX token is what actually authorizes all CX API calls.
-    # It expires in ~5 minutes and carries accountId + agentDetails.
-    # ------------------------------------------------------------------
-    cx_token, cx_refresh, rc_account_id, sub_accounts, display_name = \
+    # Get the real RC account ID from the platform API
+    rc_account_id = ""
+    display_name  = ""
+    try:
+        me = requests.get(
+            "https://platform.ringcentral.com/restapi/v1.0/account/~/extension/~",
+            headers={"Authorization": "Bearer " + rc_token}, timeout=15).json()
+        display_name  = me.get("name", "") or me.get("contact", {}).get("firstName", "")
+        rc_account_id = str(me.get("account", {}).get("id", ""))
+    except Exception:
+        pass
+
+    # Step 2 — Exchange RC token for CX token (for sub-account discovery)
+    cx_token, cx_refresh, cx_account_id, sub_accounts, cx_display_name = \
         _exchange_for_cx_token(rc_token)
+
+    if not display_name and cx_display_name:
+        display_name = cx_display_name
 
     if not cx_token:
         return render_template("error.html",
             message="Logged in to RingCentral but could not exchange for a RingCX token. "
                     "Make sure this user is a RingCX admin with WEM access enabled."), 403
 
-    session["rc_token"]         = rc_token        # keep for re-exchange if needed
+    session["rc_token"]         = rc_token
     session["rc_refresh_token"] = rc_refresh
-    session["cx_token"]         = cx_token        # used for all CX API calls
+    session["cx_token"]         = cx_token
     session["cx_refresh_token"] = cx_refresh
     session["cx_token_time"]    = datetime.now().timestamp()
-    session["rc_account_id"]    = rc_account_id
+    session["rc_account_id"]    = rc_account_id   # real RC account ID e.g. 3197280020
+    session["cx_account_id"]    = cx_account_id   # CX sub-account ID e.g. 14430010
     session["rc_display_name"]  = display_name
     session["rc_sub_accounts"]  = sub_accounts
     session.pop("oauth_state", None)
@@ -161,10 +173,12 @@ def debug_token():
     if not session.get("cx_token"):
         return jsonify({"error": "not logged in"}), 401
     return jsonify({
-        "cx_token_full": session.get("cx_token", ""),
-        "rc_token_full": session.get("rc_token", ""),
-        "rc_account_id": session.get("rc_account_id"),
-        "sub_accounts":  session.get("rc_sub_accounts"),
+        "cx_token_full":  session.get("cx_token", ""),
+        "rc_token_full":  session.get("rc_token", ""),
+        "rc_account_id":  session.get("rc_account_id"),   # real RC account e.g. 3197280020
+        "cx_account_id":  session.get("cx_account_id"),   # CX sub-account e.g. 14430010
+        "sub_accounts":   session.get("rc_sub_accounts"),
+        "display_name":   session.get("rc_display_name"),
     })
 
 
@@ -342,7 +356,8 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
     refresh_token = rc_refresh_token
     try:
         job_log(job_id, f"Starting RingCX transcript download for {customer_name}")
-        job_log(job_id, f"Account: {rc_account_id}  |  Date range: {date_from} → {date_to}")
+        job_log(job_id, f"RC Account: {rc_account_id}  |  CX Sub-account: {sub_account_id}")
+        job_log(job_id, f"Date range: {date_from} → {date_to}")
         job["progress"] = 5
 
         # ------------------------------------------------------------------
