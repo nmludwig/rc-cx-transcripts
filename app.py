@@ -453,6 +453,8 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
 
         job_log(job_id, f"Fetching transcripts for {total} segments…")
         job_log(job_id, f"Estimated time: ~{round(total * 0.5 / 60, 1)} min", "warn")
+        if all_segments:
+            job_log(job_id, f"First segment sample: {str(all_segments[0])[:300]}", "info")
 
         for i, seg in enumerate(all_segments):
             dialog_id  = seg.get("dialogId",  seg.get("dialog_id",  ""))
@@ -476,6 +478,8 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         time.sleep(30 * (attempt + 1))
                         continue
                     if tr.status_code == 404:
+                        if i < 3:
+                            job_log(job_id, f"Segment {dialog_id}/{segment_id}: no transcript (404)", "warn")
                         break
                     if tr.status_code == 401:
                         new_tok, refresh_token = _refresh_cx_token(refresh_token)
@@ -484,8 +488,13 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         continue
                     if tr.status_code == 200:
                         transcript_data = tr.json()
+                        if i < 3:
+                            job_log(job_id, f"Transcript sample: {str(transcript_data)[:200]}", "info")
                         break
-                except Exception:
+                    if i < 3:
+                        job_log(job_id, f"Transcript fetch {tr.status_code}: {tr.text[:150]}", "warn")
+                    break
+                except Exception as e:
                     time.sleep(2)
 
             lines = []
