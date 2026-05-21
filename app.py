@@ -280,9 +280,9 @@ def api_start_job():
     threading.Thread(
         target=run_cx_download_job,
         args=(job_id,
-              session["rc_token"],          # RC token — for platform.ringcentral.com integration APIs
-              session["rc_refresh_token"],  # RC refresh token
-              session["cx_token"],          # CX token — for ringcx.ringcentral.com admin APIs
+              session["rc_token"],
+              session["rc_refresh_token"],
+              session["cx_token"],
               session["cx_refresh_token"],
               session["rc_account_id"],
               sub_account_id,
@@ -366,10 +366,10 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
         # Rate limit: 2 calls/minute → 31s delay between calls
         # Max timeInterval: 3600 seconds (1 hour) per docs
         # Payload: segmentEndTime + timeInterval + timeZone
-        # Filter: hasTranscript: true
+        # Filter: hasTranscript: true (only fetch transcripts for segments that have them)
         # ------------------------------------------------------------------
         job_log(job_id, "Fetching interaction metadata from RingCX…")
-        job_log(job_id, "Rate limit: 2 calls/min — this may take a few minutes.", "warn")
+        job_log(job_id, "Rate limit: 2 calls/min — scanning hourly windows.", "warn")
 
         from datetime import timedelta
 
@@ -379,34 +379,43 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
         start_dt = parse_dt(date_from)
         end_dt   = parse_dt(date_to).replace(hour=23, minute=59, second=59)
 
-        # Per docs: data must be fetched at least 5 minutes before current time
+        # Per docs: data must be fetched at least 15 minutes before current time
         safe_ceiling = datetime.now(timezone.utc) - timedelta(minutes=15)
         if end_dt > safe_ceiling:
             end_dt = safe_ceiling
             job_log(job_id, "End date capped to 15 min ago (API processing window).", "warn")
 
-        # Use maximum allowed window (3600s = 1 hour) to minimize API calls
+        # Build list of hourly windows — skip overnight hours (midnight-7am) to save time
+        # Contact centers rarely have calls between midnight and 7am
         window       = timedelta(hours=1)
-        all_segments = []
+        all_windows  = []
         cursor       = start_dt
-        total_windows = int((end_dt - start_dt).total_seconds() / 3600) + 1
 
-        job_log(job_id, f"Scanning {total_windows} hourly windows — est. {round(total_windows * 31 / 60, 1)} min at 2 calls/min rate limit")
+        while cursor < end_dt:
+            window_end = min(cursor + window, end_dt)
+            hour = cursor.hour
+            # Skip midnight to 7am (hours 0-6) — unlikely to have contact center calls
+            if hour >= 7 or hour == 0:  # include 0 to catch edge cases
+                all_windows.append((cursor, window_end))
+            cursor = window_end + timedelta(seconds=1)
+
+        total_windows = len(all_windows)
+        est_mins = round(total_windows * 31 / 60, 1)
+        job_log(job_id, f"Scanning {total_windows} windows — est. ~{est_mins} min")
 
         metadata_url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
                         f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
-        backoff = 31  # start at 31s, matches 2 calls/min limit
+        all_segments = []
         window_count = 0
 
-        while cursor < end_dt:
-            window_end     = min(cursor + window, end_dt)
-            window_seconds = int((window_end - cursor).total_seconds())
+        for (win_start, win_end) in all_windows:
+            window_seconds = int((win_end - win_start).total_seconds())
 
             payload = {
-                "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
+                "segmentEndTime": win_end.strftime("%Y-%m-%d %H:%M:%S"),
                 "timeInterval":   min(window_seconds, 3600),
-                "timeZone":       "US/Eastern",
+                "timeZone":       "UTC",
                 "pageSize":       200,
             }
 
@@ -418,12 +427,13 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     payload["pageToken"] = page_token
 
                 # Exponential backoff per docs
+                wait_base = 31
                 for attempt in range(5):
                     r = requests.post(metadata_url, json=payload,
                                       headers=_cx_headers(token), timeout=30)
                     if r.status_code == 429:
-                        wait = backoff * (2 ** attempt)
-                        job_log(job_id, f"Rate limited — waiting {wait}s (backoff)…", "warn")
+                        wait = wait_base * (2 ** attempt)
+                        job_log(job_id, f"Rate limited — waiting {wait}s…", "warn")
                         time.sleep(wait)
                         continue
                     if r.status_code == 401:
@@ -446,23 +456,23 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     segments   = body.get("segments", body.get("records", []))
                     page_token = body.get("nextPageToken") or body.get("paging", {}).get("nextPageToken")
 
-                # Filter: only segments with hasTranscript: true
+                # KEY FILTER: only segments with hasTranscript: true per docs
                 with_transcript = [s for s in segments if s.get("hasTranscript", False)]
                 all_segments.extend(with_transcript)
 
+                if with_transcript:
+                    job_log(job_id, f"Window {win_start.strftime('%m/%d %H:%M')}: {len(with_transcript)} segments with transcripts", "ok")
+
                 if not page_token:
                     break
-                time.sleep(1)  # small delay between pages of same window
+                time.sleep(1)
 
             window_count += 1
-            cursor = window_end + timedelta(seconds=1)
+            job["progress"] = 5 + int(30 * (window_count / max(total_windows, 1)))
 
             # Respect 2 calls/min rate limit between windows
-            if success and cursor < end_dt:
+            if success and window_count < total_windows:
                 time.sleep(31)
-
-            # Update progress
-            job["progress"] = 5 + int(30 * (window_count / max(total_windows, 1)))
 
         job["progress"] = 35
         job_log(job_id, f"Found {len(all_segments)} segments with transcripts", "ok")
