@@ -455,7 +455,8 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
         job_log(job_id, f"Fetching transcripts for {total} segments…")
         job_log(job_id, f"Estimated time: ~{round(total * 0.5 / 60, 1)} min", "warn")
         if all_segments:
-            job_log(job_id, f"First segment sample: {str(all_segments[0])[:300]}", "info")
+            job_log(job_id, f"First segment keys: {list(all_segments[0].keys())}", "info")
+            job_log(job_id, f"First segment full: {str(all_segments[0])}", "info")
 
         for i, seg in enumerate(all_segments):
             dialog_id  = seg.get("dialogId",  seg.get("dialog_id",  ""))
