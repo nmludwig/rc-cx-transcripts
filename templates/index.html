@@ -180,10 +180,17 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
     <div class="form-group">
       <label>RingCX Sub-Account</label>
       <div id="subAcctLoading" class="subacct-loading visible">Loading sub-accounts…</div>
-      <select id="subAccountId" style="display:none">
+      <select id="subAccountId" style="display:none" onchange="loadQueues(this.value)">
         <option value="">— Select a sub-account —</option>
       </select>
       <div id="subAcctError" class="alert alert-warn" style="margin-top:8px;margin-bottom:0"></div>
+    </div>
+
+    <div class="form-group" id="queueGroup" style="display:none">
+      <label>Queues <span style="color:var(--muted);font-weight:400">(select queues with AI Summaries enabled, or leave blank for all)</span></label>
+      <div id="queueLoading" class="subacct-loading">Loading queues…</div>
+      <div id="queueList" style="display:none;max-height:180px;overflow-y:auto;border:1.5px solid var(--border);border-radius:var(--radius);padding:8px"></div>
+      <div id="queueError" class="alert alert-warn" style="margin-top:8px;margin-bottom:0"></div>
     </div>
 
     <div class="form-group">
@@ -307,7 +314,50 @@ function setPreset(days, btn) {
 })();
 
 // ── Sub-account loader ────────────────────────────────────────────────────────
-async function loadSubAccounts() {
+async function loadQueues(subAccountId) {
+  const group   = document.getElementById('queueGroup');
+  const loading = document.getElementById('queueLoading');
+  const list    = document.getElementById('queueList');
+  const errBox  = document.getElementById('queueError');
+
+  if (!subAccountId) { group.style.display = 'none'; return; }
+
+  group.style.display = 'block';
+  loading.classList.add('visible');
+  list.style.display = 'none';
+  list.innerHTML = '';
+  errBox.className = 'alert alert-warn';
+
+  try {
+    const res  = await fetch(`/api/queues?sub_account_id=${subAccountId}`);
+    const data = await res.json();
+    loading.classList.remove('visible');
+
+    if (!Array.isArray(data) || data.length === 0) {
+      errBox.className = 'alert alert-warn visible';
+      errBox.textContent = 'No queues found. All queues will be scanned.';
+      return;
+    }
+
+    data.filter(q => q.active).forEach(q => {
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.value = q.id; cb.className = 'queue-cb';
+      cb.style.cssText = 'width:16px;height:16px;accent-color:var(--blue);cursor:pointer';
+      const txt = document.createElement('span');
+      txt.textContent = q.group ? `${q.name} (${q.group})` : q.name;
+      row.appendChild(cb); row.appendChild(txt);
+      list.appendChild(row);
+    });
+
+    list.style.display = 'block';
+  } catch(e) {
+    loading.classList.remove('visible');
+    errBox.className = 'alert alert-warn visible';
+    errBox.textContent = 'Could not load queues — all queues will be scanned.';
+  }
+}
   const loading  = document.getElementById('subAcctLoading');
   const select   = document.getElementById('subAccountId');
   const errBox   = document.getElementById('subAcctError');
@@ -383,6 +433,7 @@ async function doStartJob() {
   const customer     = document.getElementById('customerName').value.trim() || 'Customer';
   const dateFrom     = document.getElementById('dateFrom').value;
   const dateTo       = document.getElementById('dateTo').value;
+  const queueIds     = Array.from(document.querySelectorAll('.queue-cb:checked')).map(cb => cb.value);
 
   al.className = 'alert alert-error';
   al.textContent = '';
@@ -411,6 +462,7 @@ async function doStartJob() {
         date_from:      dateFrom,
         date_to:        dateTo,
         sub_account_id: subAccountId,
+        queue_ids:      queueIds,
       })
     });
     const data = await res.json();

@@ -257,16 +257,58 @@ def api_sub_accounts():
     return jsonify(session.get("rc_sub_accounts", []))
 
 
+@app.route("/api/queues")
+def api_queues():
+    """Fetch all queues across all queue groups for the sub-account."""
+    if not session.get("cx_token"):
+        return jsonify({"error": "Not authenticated."}), 401
+    cx_token      = session.get("cx_token")
+    sub_account_id = request.args.get("sub_account_id", session.get("cx_account_id", ""))
+    if not sub_account_id:
+        return jsonify([])
+    try:
+        # Step 1: get all queue groups
+        groups_url = f"{CX_BASE}/v1/admin/accounts/{sub_account_id}/gateGroups"
+        gr = requests.get(groups_url, headers=_cx_headers(cx_token), timeout=15)
+        if gr.status_code != 200:
+            return jsonify([])
+        groups = gr.json() if isinstance(gr.json(), list) else []
+
+        # Step 2: get queues for each group
+        all_queues = []
+        for group in groups:
+            gid   = group.get("gateGroupId", "")
+            gname = group.get("groupName", "")
+            if not gid:
+                continue
+            gates_url = f"{CX_BASE}/v1/admin/accounts/{sub_account_id}/gateGroups/{gid}/gates"
+            qr = requests.get(gates_url, headers=_cx_headers(cx_token), timeout=15)
+            if qr.status_code != 200:
+                continue
+            gates = qr.json() if isinstance(qr.json(), list) else []
+            for q in gates:
+                all_queues.append({
+                    "id":    str(q.get("gateId", "")),
+                    "name":  q.get("gateName", ""),
+                    "group": gname,
+                    "active": q.get("isActive", True),
+                })
+        return jsonify(all_queues)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/start-job", methods=["POST"])
 def api_start_job():
     if not session.get("cx_token"):
         return jsonify({"error": "Not authenticated."}), 401
 
     data          = request.json or {}
-    customer_name = data.get("customer_name", "Customer").strip() or "Customer"
-    date_from     = data.get("date_from", "")
-    date_to       = data.get("date_to", "")
+    customer_name  = data.get("customer_name", "Customer").strip() or "Customer"
+    date_from      = data.get("date_from", "")
+    date_to        = data.get("date_to", "")
     sub_account_id = data.get("sub_account_id", "")
+    queue_ids      = data.get("queue_ids", [])  # empty = all queues
 
     if not date_from or not date_to:
         return jsonify({"error": "date_from and date_to are required."}), 400
@@ -288,7 +330,8 @@ def api_start_job():
               sub_account_id,
               customer_name,
               date_from,
-              date_to),
+              date_to,
+              queue_ids),
         daemon=True).start()
 
     return jsonify({"job_id": job_id})
@@ -349,15 +392,20 @@ def _cx_headers(token: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh_token,
-                        rc_account_id, sub_account_id, customer_name, date_from, date_to):
+                        rc_account_id, sub_account_id, customer_name, date_from, date_to,
+                        queue_ids=None):
     job = jobs[job_id]
-    # All CX integration APIs use CX token on ringcx.ringcentral.com
     token = cx_token
     refresh_token = cx_refresh_token
+    queue_filter = set(str(q) for q in (queue_ids or []))
     try:
         job_log(job_id, f"Starting RingCX transcript download for {customer_name}")
         job_log(job_id, f"RC Account: {rc_account_id}  |  CX Sub-account: {sub_account_id}")
         job_log(job_id, f"Date range: {date_from} → {date_to}")
+        if queue_filter:
+            job_log(job_id, f"Filtering to {len(queue_filter)} selected queue(s)", "ok")
+        else:
+            job_log(job_id, "Scanning all queues")
         job["progress"] = 5
 
         # ------------------------------------------------------------------
@@ -456,8 +504,12 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     segments   = body.get("segments", body.get("records", []))
                     page_token = body.get("nextPageToken") or body.get("paging", {}).get("nextPageToken")
 
-                # KEY FILTER: only segments with hasTranscript: true per docs
-                with_transcript = [s for s in segments if s.get("hasTranscript", False)]
+                # Filter: hasTranscript: true AND optional queue filter
+                with_transcript = [
+                    s for s in segments
+                    if s.get("hasTranscript", False)
+                    and (not queue_filter or str(s.get("channelId", "")) in queue_filter)
+                ]
                 all_segments.extend(with_transcript)
 
                 if with_transcript:
