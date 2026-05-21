@@ -388,17 +388,15 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             window_end     = min(cursor + window, end_dt)
             window_seconds = int((window_end - cursor).total_seconds())
 
-            # Correct endpoint per RingCX docs: /voice/api/cx/integration/v1/
+            # v1 endpoint correct payload: segmentEndTime + timeInterval + timeZone
             url = (f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
                    f"/sub-accounts/{sub_account_id}/interaction-metadata")
 
-            # v1 endpoint — try ISO 8601 date strings per earlier validation errors
             payload = {
-                "timeInterval": {
-                    "segmentStartDate": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "segmentEndDate":   window_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
-                "pageSize": 200,
+                "segmentEndTime": window_end.strftime("%Y-%m-%d %H:%M:%S"),
+                "timeInterval":   min(window_seconds, 3600),
+                "timeZone":       "US/Eastern",
+                "pageSize":       200,
             }
 
             page_token = None
@@ -463,25 +461,20 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
             job_log(job_id, f"First segment full: {str(all_segments[0])}", "info")
 
         for i, seg in enumerate(all_segments):
-            # Extract s-v-... and p-v-... IDs from segmentRecordingURL
-            # These are the correct dialogId/segmentId for the transcript endpoint
-            recording_url = seg.get("segmentRecordingURL", "")
-            sv_id = ""
-            pv_id = ""
-            if recording_url:
-                sv_match = re.search(r'dialogs/(s-v-[^/]+)', recording_url)
-                pv_match = re.search(r'segments/(p-v-[^/]+)/type', recording_url)
-                if sv_match:
-                    sv_id = sv_match.group(1)
-                if pv_match:
-                    pv_id = pv_match.group(1)
+            # v1 endpoint returns dialogId and segmentId directly
+            sv_id = seg.get("dialogId", "")
+            pv_id = seg.get("segmentId", "")
+
+            # Skip if no transcript available
+            if not seg.get("hasTranscript", False):
+                continue
 
             if not sv_id or not pv_id:
                 continue
 
             job["progress"] = 20 + int(65 * (i / max(total, 1)))
 
-            # Transcript endpoint uses s-v-... as dialogId and p-v-... as segmentId
+            # Transcript endpoint
             tr_url = (
                 f"{CX_BASE}/cx/integration/v1/accounts/{rc_account_id}"
                 f"/sub-accounts/{sub_account_id}"
@@ -497,7 +490,7 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                         continue
                     if tr.status_code == 404:
                         if i < 3:
-                            job_log(job_id, f"No transcript for {dialog_id}/{segment_id} (404)", "warn")
+                            job_log(job_id, f"No transcript for {sv_id}/{pv_id} (404)", "warn")
                         break
                     if tr.status_code == 401:
                         new_tok, refresh_token = _refresh_cx_token(refresh_token)
@@ -532,15 +525,15 @@ def run_cx_download_job(job_id, rc_token, rc_refresh_token, cx_token, cx_refresh
                     if text:
                         lines.append(f"{ts} {name}: {text}")
 
-            start_time   = seg.get("interactionStartTimeMs", seg.get("segmentContactStartTimeMs", ""))
-            duration_sec = int(seg.get("segmentDuration", seg.get("interactionDurationMs", 0)) or 0)
-            direction    = seg.get("interactionDirection", "")
-            from_number  = seg.get("interactionCallingAddress", "")
+            start_time   = seg.get("dialogStartTimeMs", seg.get("segmentStartTimeMs", ""))
+            duration_sec = int(seg.get("dialogDurationMs", seg.get("segmentDurationMs", 0)) or 0) // 1000
+            direction    = seg.get("dialogOrigination", "")
+            from_number  = seg.get("contactEndpointAddress", "")
             from_name    = ""
-            to_number    = seg.get("interactionCalledAddress", "")
+            to_number    = seg.get("channelEndpointAddress", "")
             to_name      = ""
             queue_name   = seg.get("campaignName", "")
-            agent_name   = seg.get("segmentAgentId", "")
+            agent_name   = seg.get("segmentParticipantId", "")
 
             transcript_records.append({
                 "dialog_id":      sv_id,
