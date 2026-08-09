@@ -1,2 +1,6 @@
 outputs/
-outputs/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+templates/index_files/
