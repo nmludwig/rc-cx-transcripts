@@ -63,6 +63,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 jobs = {}   # in-memory job store
 _last_cx_error = {}   # diagnostic: detail of the most recent CX token-exchange failure
+_last_cx_raw   = {}   # diagnostic: last CX exchange response (secrets redacted)
 
 
 # ---------------------------------------------------------------------------
@@ -168,6 +169,12 @@ def logout():
     return redirect(url_for("index"))
 
 
+@app.route("/debug/last-cx-raw")
+def debug_last_cx_raw():
+    """Temporary diagnostic — last CX exchange response, secrets redacted. Remove before production."""
+    return jsonify(_last_cx_raw or {"status": "no exchange recorded since last restart"})
+
+
 @app.route("/debug/last-cx-error")
 def debug_last_cx_error():
     """Temporary diagnostic — shows the most recent CX token-exchange failure. Remove before production."""
@@ -220,6 +227,14 @@ def _exchange_for_cx_token(rc_token: str):
         data = resp.json()
         cx_token   = data.get("accessToken", "")
         cx_refresh = data.get("refreshToken", "")
+
+        # Diagnostic: stash the full response with secrets redacted so we can
+        # inspect the account hierarchy for different user types.
+        global _last_cx_raw
+        _redacted = {"accessToken", "refreshToken", "rcAccessToken",
+                     "rcRefreshToken", "loginHashcode"}
+        _last_cx_raw = {k: ("<redacted>" if k in _redacted else v)
+                        for k, v in data.items()}
 
         if not cx_token:
             _last_cx_error = {
