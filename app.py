@@ -75,7 +75,8 @@ def index():
     if session.get("cx_token"):
         return render_template("index.html", authed=True,
                                display_name=session.get("rc_display_name", ""),
-                               sub_accounts=session.get("rc_sub_accounts", []))
+                               sub_accounts=session.get("rc_sub_accounts", []),
+                               wem_available=session.get("available_wem", True))
     return render_template("index.html", authed=False)
 
 
@@ -139,7 +140,7 @@ def oauth_callback():
         pass
 
     # Step 2 — Exchange RC token for CX token (for sub-account discovery)
-    cx_token, cx_refresh, cx_account_id, sub_accounts, cx_display_name = \
+    cx_token, cx_refresh, cx_account_id, sub_accounts, cx_display_name, available_wem = \
         _exchange_for_cx_token(rc_token)
 
     if not display_name and cx_display_name:
@@ -159,6 +160,7 @@ def oauth_callback():
     session["cx_account_id"]    = cx_account_id   # CX sub-account ID e.g. 14430010
     session["rc_display_name"]  = display_name
     session["rc_sub_accounts"]  = sub_accounts
+    session["available_wem"]    = available_wem
     session.pop("oauth_state", None)
     return redirect(url_for("index"))
 
@@ -205,8 +207,8 @@ def debug_token():
 def _exchange_for_cx_token(rc_token: str):
     """
     Exchange a RingCentral OAuth token for a RingCX-specific token.
-    Returns (cx_token, cx_refresh, rc_account_id, sub_accounts, display_name)
-    or (None, None, None, [], "") on failure.
+    Returns (cx_token, cx_refresh, rc_account_id, sub_accounts, display_name,
+    available_wem) or (None, None, None, [], "", False) on failure.
     """
     global _last_cx_error
     try:
@@ -298,14 +300,15 @@ def _exchange_for_cx_token(rc_token: str):
         elif cx_token:
             _last_cx_error = {}   # clear on success
 
-        return cx_token, cx_refresh, rc_account_id, sub_accounts, display_name
+        return (cx_token, cx_refresh, rc_account_id, sub_accounts,
+                display_name, bool(data.get("availableWEM")))
 
     except Exception as e:
         _last_cx_error = {
             "stage": "exception", "error": repr(e),
             "time": datetime.now().isoformat()}
         print(f"[CX-EXCHANGE] exception: {e!r}", file=sys.stderr, flush=True)
-        return None, None, None, [], ""
+        return None, None, None, [], "", False
 
 
 def _refresh_cx_token(cx_refresh: str):

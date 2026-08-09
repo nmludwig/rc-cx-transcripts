@@ -176,6 +176,16 @@ input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,10
 
     <div id="alertStep0" class="alert alert-error"></div>
 
+    {% if authed and not wem_available %}
+    <div class="alert alert-warn visible" style="margin-bottom:16px">
+      <strong>WEM is not enabled on this RingCX account.</strong><br>
+      Transcript export requires the WEM add-on at the <em>account</em> level (a
+      user-role "WEM access" permission alone is not enough). Downloads will
+      fail until RingCX provisioning enables WEM for this account. Contact your
+      RingCentral representative.
+    </div>
+    {% endif %}
+
     <!-- Sub-account selector -->
     <div class="form-group">
       <label>RingCX Sub-Account</label>
