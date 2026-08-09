@@ -62,6 +62,7 @@ OUTPUT_DIR = Path(__file__).parent / "outputs"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 jobs = {}   # in-memory job store
+_last_cx_error = {}   # diagnostic: detail of the most recent CX token-exchange failure
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +168,14 @@ def logout():
     return redirect(url_for("index"))
 
 
+@app.route("/debug/last-cx-error")
+def debug_last_cx_error():
+    """Temporary diagnostic — shows the most recent CX token-exchange failure. Remove before production."""
+    if not _last_cx_error:
+        return jsonify({"status": "no failure recorded since last restart / last success"})
+    return jsonify(_last_cx_error)
+
+
 @app.route("/debug/token")
 def debug_token():
     """Temporary debug route — remove before production."""
@@ -192,6 +201,7 @@ def _exchange_for_cx_token(rc_token: str):
     Returns (cx_token, cx_refresh, rc_account_id, sub_accounts, display_name)
     or (None, None, None, [], "") on failure.
     """
+    global _last_cx_error
     try:
         resp = requests.post(
             CX_TOKEN_URL + "?includeRefresh=true",
@@ -200,11 +210,23 @@ def _exchange_for_cx_token(rc_token: str):
             timeout=15)
 
         if resp.status_code != 200:
+            _last_cx_error = {
+                "stage": "http_error", "status": resp.status_code,
+                "body": resp.text[:2000], "time": datetime.now().isoformat()}
+            print(f"[CX-EXCHANGE] HTTP {resp.status_code}: {resp.text[:2000]}",
+                  file=sys.stderr, flush=True)
             return None, None, None, [], ""
 
         data = resp.json()
         cx_token   = data.get("accessToken", "")
         cx_refresh = data.get("refreshToken", "")
+
+        if not cx_token:
+            _last_cx_error = {
+                "stage": "no_access_token", "status": 200,
+                "body": resp.text[:2000], "time": datetime.now().isoformat()}
+            print(f"[CX-EXCHANGE] 200 but no accessToken: {resp.text[:2000]}",
+                  file=sys.stderr, flush=True)
 
         # Pull sub-accounts and display name from agentDetails
         agent_details = data.get("agentDetails", [])
@@ -224,9 +246,16 @@ def _exchange_for_cx_token(rc_token: str):
             if not rc_account_id and acct_id:
                 rc_account_id = acct_id
 
+        if cx_token:
+            _last_cx_error = {}   # clear on success
+
         return cx_token, cx_refresh, rc_account_id, sub_accounts, display_name
 
     except Exception as e:
+        _last_cx_error = {
+            "stage": "exception", "error": repr(e),
+            "time": datetime.now().isoformat()}
+        print(f"[CX-EXCHANGE] exception: {e!r}", file=sys.stderr, flush=True)
         return None, None, None, [], ""
 
 
