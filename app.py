@@ -228,13 +228,17 @@ def _exchange_for_cx_token(rc_token: str):
             print(f"[CX-EXCHANGE] 200 but no accessToken: {resp.text[:2000]}",
                   file=sys.stderr, flush=True)
 
-        # Pull sub-accounts and display name from agentDetails
-        agent_details = data.get("agentDetails", [])
+        # Pull sub-accounts and display name from agentDetails.
+        # NOTE: the key may be present-but-null (e.g. admin-only users with no
+        # agent profile), so `or []` — a bare default of [] does NOT cover null.
+        agent_details = data.get("agentDetails") or []
         sub_accounts  = []
         display_name  = ""
         rc_account_id = ""
 
-        for agent in agent_details:
+        for agent in (agent_details or []):
+            if not isinstance(agent, dict):
+                continue
             acct_id   = str(agent.get("accountId", ""))
             acct_name = agent.get("accountName", "")
             first     = agent.get("firstName", "")
@@ -246,7 +250,18 @@ def _exchange_for_cx_token(rc_token: str):
             if not rc_account_id and acct_id:
                 rc_account_id = acct_id
 
-        if cx_token:
+        if cx_token and not sub_accounts:
+            # Exchange succeeded but no sub-account discovered via agentDetails.
+            # Record the response's top-level keys (values redacted) so we can
+            # find where the account id lives for admin-only users.
+            print(f"[CX-EXCHANGE] token OK but no sub-accounts; keys={list(data.keys())}",
+                  file=sys.stderr, flush=True)
+            _last_cx_error = {
+                "stage": "no_sub_accounts", "status": 200,
+                "response_keys": list(data.keys()),
+                "agentDetails_type": type(data.get("agentDetails")).__name__,
+                "time": datetime.now().isoformat()}
+        elif cx_token:
             _last_cx_error = {}   # clear on success
 
         return cx_token, cx_refresh, rc_account_id, sub_accounts, display_name
