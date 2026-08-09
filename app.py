@@ -250,16 +250,35 @@ def _exchange_for_cx_token(rc_token: str):
             if not rc_account_id and acct_id:
                 rc_account_id = acct_id
 
+        # Admin-only users have null agentDetails, so fall back to the account
+        # ids carried elsewhere in the token payload.
         if cx_token and not sub_accounts:
-            # Exchange succeeded but no sub-account discovered via agentDetails.
-            # Record the response's top-level keys (values redacted) so we can
-            # find where the account id lives for admin-only users.
+            managed = data.get("managedMainAccountIds") or []
+            if not isinstance(managed, list):
+                managed = [managed]
+            main_id = data.get("mainAccountId")
+            ids = [str(x) for x in managed if x]
+            if main_id and str(main_id) not in ids:
+                ids.insert(0, str(main_id))
+            for acct_id in ids:
+                if not any(s["id"] == acct_id for s in sub_accounts):
+                    sub_accounts.append({"id": acct_id, "name": f"RingCX Account {acct_id}"})
+            if not rc_account_id and ids:
+                rc_account_id = ids[0]
+
+        if cx_token and not sub_accounts:
+            # Still nothing — record what the payload actually contains so we
+            # can locate the account id.
             print(f"[CX-EXCHANGE] token OK but no sub-accounts; keys={list(data.keys())}",
                   file=sys.stderr, flush=True)
             _last_cx_error = {
                 "stage": "no_sub_accounts", "status": 200,
                 "response_keys": list(data.keys()),
                 "agentDetails_type": type(data.get("agentDetails")).__name__,
+                "mainAccountId": data.get("mainAccountId"),
+                "managedMainAccountIds": data.get("managedMainAccountIds"),
+                "adminId": data.get("adminId"),
+                "availableWEM": data.get("availableWEM"),
                 "time": datetime.now().isoformat()}
         elif cx_token:
             _last_cx_error = {}   # clear on success
